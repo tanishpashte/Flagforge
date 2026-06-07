@@ -1,8 +1,9 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from backend.app.database import init_db
 from backend.app.routes import projects, flags, configs
+from backend.app.ws_manager import manager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -28,6 +29,18 @@ app.add_middleware(
 app.include_router(projects.router)
 app.include_router(flags.router)
 app.include_router(configs.router)
+
+@app.websocket("/api/stream/{project_id}")
+async def websocket_endpoint(websocket: WebSocket, project_id: int):
+    await websocket.accept()
+    await manager.connect(websocket, project_id)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        await manager.disconnect(websocket, project_id)
 
 @app.get("/")
 def read_root():

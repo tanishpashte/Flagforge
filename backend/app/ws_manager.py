@@ -10,7 +10,9 @@ class ConnectionManager:
 
     async def connect(self, websocket: WebSocket, project_id: int):
         """Accepts a WebSocket connection and registers it under the given project_id."""
-        await websocket.accept()
+        from fastapi.websockets import WebSocketState
+        if websocket.application_state == WebSocketState.CONNECTING:
+            await websocket.accept()
         if project_id not in self.active_connections:
             self.active_connections[project_id] = set()
         self.active_connections[project_id].add(websocket)
