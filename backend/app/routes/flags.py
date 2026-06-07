@@ -4,6 +4,7 @@ from typing import List
 from datetime import datetime
 from backend.app.database import get_session
 from backend.app.models import FeatureFlag, FeatureFlagBase
+from backend.app.ws_manager import manager
 
 router = APIRouter(prefix="/api/flags", tags=["Feature Flags"])
 
@@ -24,7 +25,7 @@ def create_flag(flag: FeatureFlagBase, session: Session = Depends(get_session)):
     return db_flag
 
 @router.patch("/{flag_id}/toggle", response_model=FeatureFlag)
-def toggle_flag(flag_id: int, session: Session = Depends(get_session)):
+async def toggle_flag(flag_id: int, session: Session = Depends(get_session)):
     db_flag = session.get(FeatureFlag, flag_id)
     if not db_flag:
         raise HTTPException(status_code=404, detail="Flag not found")
@@ -37,5 +38,10 @@ def toggle_flag(flag_id: int, session: Session = Depends(get_session)):
     session.commit()
     session.refresh(db_flag)
     
-    # TODO: Trigger WebSocket Broadcast here
+    await manager.broadcast_to_project(db_flag.project_id, {
+        "type": "flag",
+        "key": db_flag.key,
+        "is_enabled": db_flag.is_enabled,
+        "action": "update"
+    })
     return db_flag

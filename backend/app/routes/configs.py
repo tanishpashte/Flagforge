@@ -4,6 +4,7 @@ from typing import List
 from datetime import datetime
 from backend.app.database import get_session
 from backend.app.models import RemoteConfig, RemoteConfigBase
+from backend.app.ws_manager import manager
 
 router = APIRouter(prefix="/api/configs", tags=["Remote Configurations"])
 
@@ -29,7 +30,7 @@ def read_configs(project_id: int, session: Session = Depends(get_session)):
     return session.exec(statement).all()
 
 @router.patch("/{config_id}", response_model=RemoteConfig)
-def update_config(config_id: int, updated_fields: RemoteConfigBase, session: Session = Depends(get_session)):
+async def update_config(config_id: int, updated_fields: RemoteConfigBase, session: Session = Depends(get_session)):
     db_config = session.get(RemoteConfig, config_id)
     if not db_config:
         raise HTTPException(status_code=404, detail="Configuration not found")
@@ -45,16 +46,34 @@ def update_config(config_id: int, updated_fields: RemoteConfigBase, session: Ses
     session.commit()
     session.refresh(db_config)
     
-    # TODO: Trigger WebSocket Broadcast here in Phase 3!
+    await manager.broadcast_to_project(db_config.project_id, {
+        "type": "config",
+        "key": db_config.key,
+        "value_type": db_config.value_type,
+        "value": db_config.value,
+        "action": "update"
+    })
     return db_config
 
 @router.delete("/{config_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_config(config_id: int, session: Session = Depends(get_session)):
+async def delete_config(config_id: int, session: Session = Depends(get_session)):
     db_config = session.get(RemoteConfig, config_id)
     if not db_config:
         raise HTTPException(status_code=404, detail="Configuration not found")
         
+    project_id = db_config.project_id
+    key = db_config.key
+    value_type = db_config.value_type
+    value = db_config.value
+    
     session.delete(db_config)
     session.commit()
-    # TODO: Trigger WebSocket Broadcast here
+    
+    await manager.broadcast_to_project(project_id, {
+        "type": "config",
+        "key": key,
+        "value_type": value_type,
+        "value": value,
+        "action": "delete"
+    })
     return None
