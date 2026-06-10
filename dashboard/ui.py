@@ -7,9 +7,10 @@ A btop-inspired terminal user interface for managing projects, feature flags, an
 from datetime import datetime
 from typing import Any
 
+import httpx
 from textual.app import App, ComposeResult
 from textual.containers import Grid, Horizontal, Vertical
-from textual.widgets import Footer, Label, ListItem, ListView, Static
+from textual.widgets import Footer, Input, Label, ListItem, ListView, Static
 
 
 class ClockWidget(Static):
@@ -50,10 +51,11 @@ class ProjectItem(ListItem):
 class FeatureFlagItem(ListItem):
     """ListItem representing a feature flag."""
 
-    def __init__(self, name: str, enabled: bool):
+    def __init__(self, name: str, enabled: bool, description: str = ""):
         super().__init__()
         self.flag_name = name
         self.enabled = enabled
+        self.flag_description = description or ""
 
     def compose(self) -> ComposeResult:
         icon = "" if self.enabled else ""
@@ -65,10 +67,11 @@ class FeatureFlagItem(ListItem):
 class RemoteConfigItem(ListItem):
     """ListItem representing a remote configuration."""
 
-    def __init__(self, key: str, value: Any):
+    def __init__(self, key: str, value: Any, description: str = ""):
         super().__init__()
         self.config_key = key
         self.config_value = value
+        self.config_description = description or ""
 
     def compose(self) -> ComposeResult:
         icon = "⚙"
@@ -88,45 +91,27 @@ class ProjectsList(ListView):
     """ListView containing project items."""
 
     def __init__(self) -> None:
-        items = [
-            ProjectItem("Main Backend Service", "main-backend", True),
-            ProjectItem("React Frontend Admin", "react-admin", True),
-            ProjectItem("Staging API Gateway", "staging-gateway", True),
-            ProjectItem("Mobile Application", "ios-android-app", False),
-        ]
-        super().__init__(*items, id="projects-list")
+        super().__init__(id="projects-list")
         self.border_title = "󱃚 PROJECTS"
-        self.border_subtitle = f"{len(items)} items"
+        self.border_subtitle = "0 items"
 
 
 class FeatureFlagsList(ListView):
     """ListView containing feature flag items."""
 
     def __init__(self) -> None:
-        items = [
-            FeatureFlagItem("new-billing-flow", True),
-            FeatureFlagItem("beta-dashboard-v2", False),
-            FeatureFlagItem("maintenance-mode", False),
-            FeatureFlagItem("graphql-api-migration", True),
-        ]
-        super().__init__(*items, id="feature-flags-list")
+        super().__init__(id="feature-flags-list")
         self.border_title = " FEATURE FLAGS"
-        self.border_subtitle = f"{len(items)} items"
+        self.border_subtitle = "0 items"
 
 
 class RemoteConfigsList(ListView):
     """ListView containing remote configuration items."""
 
     def __init__(self) -> None:
-        items = [
-            RemoteConfigItem("max_retry_attempts", 5),
-            RemoteConfigItem("session_timeout_seconds", 3600),
-            RemoteConfigItem("api_base_url", "https://api.flagforge.dev"),
-            RemoteConfigItem("allow_public_registrations", True),
-        ]
-        super().__init__(*items, id="remote-configs-list")
+        super().__init__(id="remote-configs-list")
         self.border_title = "⚙ REMOTE CONFIGS"
-        self.border_subtitle = f"{len(items)} items"
+        self.border_subtitle = "0 items"
 
 
 class FlagForgeApp(App):
@@ -145,6 +130,7 @@ class FlagForgeApp(App):
     def compose(self) -> ComposeResult:
         """Compose the layout and child widgets."""
         yield CustomHeader()
+        yield Input(placeholder="🔍 Search flags or configs by name...", id="search-bar")
         with Grid(id="dashboard-grid"):
             yield ProjectsList()
             with Vertical(id="right-column"):
@@ -152,9 +138,123 @@ class FlagForgeApp(App):
                 yield RemoteConfigsList()
         yield Footer()
 
+    def on_mount(self) -> None:
+        """Load backend data on startup."""
+        self.run_worker(self.load_data())
+
+    async def load_data(self) -> None:
+        """Fetch real-world data from the running FastAPI HTTP backend endpoints."""
+        self.notify("Fetching data from FlagForge backend...", title="Loading", severity="information")
+        try:
+            async with httpx.AsyncClient(base_url="http://localhost:8000") as client:
+                # 1. Fetch projects
+                projects_response = await client.get("/api/projects/")
+                if projects_response.status_code == 200:
+                    projects = projects_response.json()
+                else:
+                    projects = []
+
+                # 2. Fetch flags
+                flags_response = await client.get("/api/flags/")
+                if flags_response.status_code == 200:
+                    flags = flags_response.json()
+                else:
+                    flags = []
+
+                # 3. Fetch configs for all projects
+                configs = []
+                for p in projects:
+                    p_id = p.get("id")
+                    if p_id is not None:
+                        configs_response = await client.get(f"/api/configs/?project_id={p_id}")
+                        if configs_response.status_code == 200:
+                            configs.extend(configs_response.json())
+
+                # Populate UI lists
+                self.update_lists(projects, flags, configs)
+                self.notify("Successfully loaded data from backend.", title="Sync Complete", severity="information")
+        except Exception as e:
+            self.notify(f"Could not connect to backend: {e}", title="Offline Mode", severity="warning")
+
+    def update_lists(self, projects: list, flags: list, configs: list) -> None:
+        """Clear and repopulate ListView widgets with fetched data."""
+        # Update Projects
+        proj_list = self.query_one("#projects-list", ProjectsList)
+        proj_list.clear()
+        for p in projects:
+            proj_list.append(ProjectItem(p["name"], p.get("description") or "Active", True))
+        proj_list.border_subtitle = f"{len(projects)} items"
+
+        # Update Flags
+        flags_list = self.query_one("#feature-flags-list", FeatureFlagsList)
+        flags_list.clear()
+        for f in flags:
+            flags_list.append(FeatureFlagItem(f["key"], f["is_enabled"], f.get("description") or ""))
+        flags_list.border_subtitle = f"{len(flags)} items"
+
+        # Update Configs
+        configs_list = self.query_one("#remote-configs-list", RemoteConfigsList)
+        configs_list.clear()
+        for c in configs:
+            configs_list.append(RemoteConfigItem(c["key"], c["value"], c.get("description") or ""))
+        configs_list.border_subtitle = f"{len(configs)} items"
+
+        # Re-apply active search filter
+        search_bar = self.query_one("#search-bar", Input)
+        search_query = search_bar.value.strip().lower()
+        self.filter_lists(search_query)
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Handle live search filtering as the user types in the search bar."""
+        if event.input.id == "search-bar":
+            search_query = event.value.strip().lower()
+            self.filter_lists(search_query)
+
+    def filter_lists(self, query: str) -> None:
+        """Filter feature flags and configs based on search query."""
+        # Filter feature flags
+        ff_list = self.query_one("#feature-flags-list", FeatureFlagsList)
+        visible_flags = 0
+        total_flags = 0
+        for item in ff_list.query(FeatureFlagItem):
+            total_flags += 1
+            match = (
+                not query or 
+                query in item.flag_name.lower() or 
+                query in item.flag_description.lower()
+            )
+            item.display = match
+            if match:
+                visible_flags += 1
+        
+        if query:
+            ff_list.border_subtitle = f"Filtered: {visible_flags}/{total_flags}"
+        else:
+            ff_list.border_subtitle = f"{total_flags} items"
+
+        # Filter configs
+        cfg_list = self.query_one("#remote-configs-list", RemoteConfigsList)
+        visible_configs = 0
+        total_configs = 0
+        for item in cfg_list.query(RemoteConfigItem):
+            total_configs += 1
+            match = (
+                not query or 
+                query in item.config_key.lower() or 
+                query in item.config_description.lower()
+            )
+            item.display = match
+            if match:
+                visible_configs += 1
+        
+        if query:
+            cfg_list.border_subtitle = f"Filtered: {visible_configs}/{total_configs}"
+        else:
+            cfg_list.border_subtitle = f"{total_configs} items"
+
     def action_refresh_data(self) -> None:
-        """Simulate refreshing dashboard data."""
-        self.notify("Refreshing dashboard data from database...", title="Syncing", severity="information")
+        """Fetch fresh data from the backend."""
+        self.run_worker(self.load_data())
 
 
 if __name__ == "__main__":
