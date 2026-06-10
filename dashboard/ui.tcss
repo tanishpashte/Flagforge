@@ -1,0 +1,103 @@
+/* Color variables */
+$background: #11111b;
+$surface: #181825;
+$accent: #89b4fa;
+$border-inactive: #313244;
+$border-active: #89b4fa;
+$text: #cdd6f4;
+$text-muted: #7f849c;
+
+Screen {
+    background: $background;
+    color: $text;
+}
+
+/* Custom Header styling */
+CustomHeader {
+    dock: top;
+    height: 3;
+    background: $surface;
+    border-bottom: tall $border-inactive;
+    padding: 0 2;
+}
+
+#header-container {
+    layout: horizontal;
+    height: 100%;
+}
+
+#header-title {
+    content-align: left middle;
+    width: 1fr;
+}
+
+#header-status {
+    content-align: center middle;
+    width: 2fr;
+    color: $text-muted;
+}
+
+ClockWidget {
+    content-align: right middle;
+    width: 1fr;
+    color: #f9e2af;
+}
+
+/* Dashboard Grid Layout */
+#dashboard-grid {
+    layout: grid;
+    grid-size: 2 1;
+    grid-columns: 1fr 2fr;
+    padding: 1;
+    grid-gutter: 2;
+}
+
+#right-column {
+    layout: vertical;
+}
+
+/* List views as panels */
+ListView {
+    background: $surface;
+    border: round $border-inactive;
+    border-title-color: $text-muted;
+    border-subtitle-color: #45475a;
+    border-subtitle-align: right;
+    padding: 1;
+    height: 100%;
+}
+
+#right-column > ListView {
+    height: 1fr;
+    margin-bottom: 1;
+}
+
+#right-column > ListView:last-child {
+    margin-bottom: 0;
+}
+
+ListView:focus {
+    border: round $border-active;
+    border-title-color: $border-active;
+    border-subtitle-color: $text;
+    background: #1e1e2e;
+}
+
+/* List Items styling */
+ListItem {
+    padding: 0 1;
+    background: transparent;
+    color: $text;
+    height: auto;
+}
+
+ListItem:focus {
+    background: #313244;
+    color: #ffffff;
+    text-style: bold;
+}
+
+/* Disable default ListView border when focused to avoid double border */
+ListView > ListItem {
+    border: none;
+}
