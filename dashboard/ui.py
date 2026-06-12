@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Any
 
 import httpx
+from textual import events
 from textual.app import App, ComposeResult
 from textual.containers import Grid, Horizontal, Vertical
 from textual.widgets import Footer, Input, Label, ListItem, ListView, Static
@@ -51,8 +52,9 @@ class ProjectItem(ListItem):
 class FeatureFlagItem(ListItem):
     """ListItem representing a feature flag."""
 
-    def __init__(self, name: str, enabled: bool, description: str = ""):
+    def __init__(self, flag_id: int, name: str, enabled: bool, description: str = ""):
         super().__init__()
+        self.flag_id = flag_id
         self.flag_name = name
         self.enabled = enabled
         self.flag_description = description or ""
@@ -61,7 +63,18 @@ class FeatureFlagItem(ListItem):
         icon = "" if self.enabled else ""
         status_text = "ON" if self.enabled else "OFF"
         status_color = "#a6e3a1" if self.enabled else "#f38ba8"
-        yield Label(f"[{status_color}]{icon}[/]  [bold #cdd6f4]{self.flag_name}[/] [dim #7f849c]is[/] [{status_color}]{status_text}[/]")
+        yield Label(
+            f"[{status_color}]{icon}[/]  [bold #cdd6f4]{self.flag_name}[/] [dim #7f849c]is[/] [{status_color}]{status_text}[/]",
+            id="flag-label"
+        )
+
+    def update_state(self, enabled: bool) -> None:
+        self.enabled = enabled
+        icon = "" if self.enabled else ""
+        status_text = "ON" if self.enabled else "OFF"
+        status_color = "#a6e3a1" if self.enabled else "#f38ba8"
+        label = self.query_one("#flag-label", Label)
+        label.update(f"[{status_color}]{icon}[/]  [bold #cdd6f4]{self.flag_name}[/] [dim #7f849c]is[/] [{status_color}]{status_text}[/]")
 
 
 class RemoteConfigItem(ListItem):
@@ -189,7 +202,7 @@ class FlagForgeApp(App):
         flags_list = self.query_one("#feature-flags-list", FeatureFlagsList)
         flags_list.clear()
         for f in flags:
-            flags_list.append(FeatureFlagItem(f["key"], f["is_enabled"], f.get("description") or ""))
+            flags_list.append(FeatureFlagItem(f["id"], f["key"], f["is_enabled"], f.get("description") or ""))
         flags_list.border_subtitle = f"{len(flags)} items"
 
         # Update Configs
@@ -251,6 +264,44 @@ class FlagForgeApp(App):
             cfg_list.border_subtitle = f"Filtered: {visible_configs}/{total_configs}"
         else:
             cfg_list.border_subtitle = f"{total_configs} items"
+
+    def on_key(self, event: events.Key) -> None:
+        """Handle keyboard interactions globally."""
+        if event.key == "space":
+            # Avoid triggering toggling if typing in search bar
+            if self.focused and self.focused.id == "search-bar":
+                return
+            
+            focused_widget = self.focused
+            if isinstance(focused_widget, FeatureFlagsList):
+                highlighted = focused_widget.highlighted_child
+                if isinstance(highlighted, FeatureFlagItem):
+                    self.run_worker(self.toggle_feature_flag(highlighted))
+                    event.prevent_default()
+                    event.stop()
+
+    async def toggle_feature_flag(self, item: FeatureFlagItem) -> None:
+        """Send asynchronous HTTP PATCH request to backend to toggle the flag."""
+        try:
+            async with httpx.AsyncClient(base_url="http://localhost:8000") as client:
+                response = await client.patch(f"/api/flags/{item.flag_id}/toggle")
+                if response.status_code == 200:
+                    data = response.json()
+                    new_enabled = data["is_enabled"]
+                    item.update_state(new_enabled)
+                    self.notify(
+                        f"Flag '{item.flag_name}' turned {'ON' if new_enabled else 'OFF'}",
+                        title="Mutation Successful",
+                        severity="information"
+                    )
+                else:
+                    self.notify(
+                        f"Failed to toggle flag: {response.status_code}",
+                        title="Mutation Failed",
+                        severity="error"
+                    )
+        except Exception as e:
+            self.notify(f"Connection error: {e}", title="Network Error", severity="error")
 
     def action_refresh_data(self) -> None:
         """Fetch fresh data from the backend."""
