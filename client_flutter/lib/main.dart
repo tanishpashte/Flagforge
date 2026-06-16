@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'sdk/flagforge_client.dart';
+import 'flagforge_sdk.dart';
 import 'sdk/models.dart';
 
 void main() {
@@ -42,7 +42,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final TextEditingController _projectIdController = TextEditingController(text: '1');
 
   FlagForgeClient? _client;
-  StreamSubscription? _updateSubscription;
   bool _isConnecting = false;
   String? _statusMessage;
 
@@ -60,7 +59,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     // Clean up existing client connection
     if (_client != null) {
-      _updateSubscription?.cancel();
+      _client!.removeListener(_onClientUpdate);
       _client!.dispose();
     }
 
@@ -69,20 +68,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     _client = FlagForgeClient(
       host: host,
-      projectId: projectId,
-      useHttps: false,
     );
 
     try {
-      await _client!.initialize();
-      _updateSubscription = _client!.onUpdate.listen((_) {
-        // Trigger widget rebuild when WebSocket broadcasts an update
-        if (mounted) {
-          setState(() {
-            _statusMessage = 'Updated: ${DateTime.now().toLocal().toString().split('.').first.split(' ').last}';
-          });
-        }
-      });
+      await _client!.initialize(projectId);
+      _client!.addListener(_onClientUpdate);
 
       if (mounted) {
         setState(() {
@@ -100,9 +90,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  void _onClientUpdate() {
+    if (mounted) {
+      setState(() {
+        _statusMessage = 'Updated: ${DateTime.now().toLocal().toString().split('.').first.split(' ').last}';
+      });
+    }
+  }
+
   @override
   void dispose() {
-    _updateSubscription?.cancel();
+    _client?.removeListener(_onClientUpdate);
     _client?.dispose();
     _hostController.dispose();
     _projectIdController.dispose();
@@ -148,7 +146,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         actions: [
           Container(
             margin: const EdgeInsets.only(right: 16),
-            padding: const EdgeInsets.symmetric(horizontal: 12, py: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               color: _isConnecting
                   ? Colors.amber.withOpacity(0.15)
@@ -310,8 +308,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ],
 
               // Application Simulated Visual Sandbox
-              Card(
-                elevation: 4,
+              Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: enablePremiumTheme
@@ -323,6 +320,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     color: enablePremiumTheme ? const Color(0xFFF9E2AF) : const Color(0xFF313244),
                     width: enablePremiumTheme ? 1.5 : 1,
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(20.0),
@@ -413,7 +417,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       ? Text(flag.description!, style: const TextStyle(fontSize: 12, color: Colors.grey))
                                       : null,
                                   trailing: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, py: 4),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                     decoration: BoxDecoration(
                                       color: flag.isEnabled
                                           ? Colors.green.withOpacity(0.2)

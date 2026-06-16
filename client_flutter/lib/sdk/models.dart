@@ -48,7 +48,7 @@ class Project {
       'name': name,
       if (description != null) 'description': description,
       if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
-    );
+    };
   }
 }
 
@@ -120,7 +120,7 @@ class FeatureFlag {
       'targeting_rules': targetingRules,
       'project_id': projectId,
       if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
-    );
+    };
   }
 }
 
@@ -170,7 +170,6 @@ class RemoteConfig {
       case ConfigType.number:
         return num.tryParse(value) ?? value;
       case ConfigType.string:
-      default:
         return value;
     }
   }
@@ -198,6 +197,6 @@ class RemoteConfig {
       'value': value,
       'project_id': projectId,
       if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
-    );
+    };
   }
 }
