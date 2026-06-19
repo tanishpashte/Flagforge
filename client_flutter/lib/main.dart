@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'flagforge_sdk.dart';
 
 void main() {
   runApp(const FlagForgeExampleApp());
@@ -12,113 +14,107 @@ class FlagForgeExampleApp extends StatefulWidget {
 }
 
 class _FlagForgeExampleAppState extends State<FlagForgeExampleApp> {
-  // Local state representing mock flags and configs (No networking / no state management)
-  bool _darkMode = true;
-  bool _premiumTheme = false;
-  bool _showBanner = true;
-  String _bannerMessage = 'Welcome to FlagForge Static Preview!';
-  String _accentColorHex = '#89B4FA';
+  // Instantiate FlagForgeClient
+  final FlagForgeClient _client = FlagForgeClient();
+  Timer? _mockUpdateTimer;
 
-  // Local state updates
-  void _toggleDarkMode() {
-    setState(() {
-      _darkMode = !_darkMode;
-    });
-  }
+  @override
+  void initState() {
+    super.initState();
+    // Default mock data to populate client cache map
+    _client.setFlag('dark_mode', true);
+    _client.setFlag('premium_theme', false);
+    _client.setFlag('show_banner', true);
+    _client.setConfig('banner_message', 'Welcome to FlagForge Client-Side Cache Injection!');
+    _client.setConfig('theme_accent_color', '#89B4FA');
 
-  void _togglePremiumTheme() {
-    setState(() {
-      _premiumTheme = !_premiumTheme;
-    });
-  }
-
-  void _toggleShowBanner() {
-    setState(() {
-      _showBanner = !_showBanner;
-    });
-  }
-
-  void _updateBannerMessage(String msg) {
-    setState(() {
-      _bannerMessage = msg;
-    });
-  }
-
-  void _updateAccentColor(String hex) {
-    setState(() {
-      _accentColorHex = hex;
+    // Simulate real-time local update to verify visual transformations
+    _mockUpdateTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) {
+        _client.setFlag('premium_theme', true);
+        _client.setConfig(
+          'banner_message',
+          'UI successfully transformed via local client state update!',
+        );
+      }
     });
   }
 
   @override
-  Widget build(BuildContext context) {
-    // Dynamically parse hex color
-    Color accentColor = const Color(0xFF89B4FA);
-    try {
-      final hex = _accentColorHex.replaceAll('#', '');
-      if (hex.length == 6) {
-        accentColor = Color(int.parse('FF$hex', radix: 16));
-      } else if (hex.length == 8) {
-        accentColor = Color(int.parse(hex, radix: 16));
-      }
-    } catch (_) {}
+  void dispose() {
+    _mockUpdateTimer?.cancel();
+    _client.dispose();
+    super.dispose();
+  }
 
-    return MaterialApp(
-      title: 'FlagForge SDK Shell',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: _darkMode ? Brightness.dark : Brightness.light,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: accentColor,
-          brightness: _darkMode ? Brightness.dark : Brightness.light,
-          surface: _darkMode ? const Color(0xFF0F0F1A) : const Color(0xFFF4F5FA),
-        ),
-        fontFamily: 'Outfit',
-      ),
-      home: DashboardScreen(
-        darkMode: _darkMode,
-        premiumTheme: _premiumTheme,
-        showBanner: _showBanner,
-        bannerMessage: _bannerMessage,
-        accentColor: accentColor,
-        accentColorHex: _accentColorHex,
-        onToggleDarkMode: _toggleDarkMode,
-        onTogglePremiumTheme: _togglePremiumTheme,
-        onToggleShowBanner: _toggleShowBanner,
-        onUpdateBannerMessage: _updateBannerMessage,
-        onUpdateAccentColor: _updateAccentColor,
-      ),
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: _client,
+      builder: (context, child) {
+        final darkMode = _client.isEnabled('dark_mode', defaultValue: true);
+        final premiumTheme = _client.isEnabled('premium_theme', defaultValue: false);
+        final showBanner = _client.isEnabled('show_banner', defaultValue: true);
+        final bannerMessage = _client.getConfigValue('banner_message', defaultValue: 'Welcome to FlagForge Static Preview!');
+        final accentColorHex = _client.getConfigValue('theme_accent_color', defaultValue: '#89B4FA');
+
+        // Dynamically parse hex color
+        Color accentColor = const Color(0xFF89B4FA);
+        try {
+          final hex = accentColorHex.replaceAll('#', '');
+          if (hex.length == 6) {
+            accentColor = Color(int.parse('FF$hex', radix: 16));
+          } else if (hex.length == 8) {
+            accentColor = Color(int.parse(hex, radix: 16));
+          }
+        } catch (_) {}
+
+        return MaterialApp(
+          title: 'FlagForge SDK Shell',
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(
+            useMaterial3: true,
+            brightness: darkMode ? Brightness.dark : Brightness.light,
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: accentColor,
+              brightness: darkMode ? Brightness.dark : Brightness.light,
+              surface: darkMode ? const Color(0xFF0F0F1A) : const Color(0xFFF4F5FA),
+            ),
+            fontFamily: 'Outfit',
+          ),
+          home: DashboardScreen(
+            client: _client,
+            darkMode: darkMode,
+            premiumTheme: premiumTheme,
+            showBanner: showBanner,
+            bannerMessage: bannerMessage,
+            accentColor: accentColor,
+            accentColorHex: accentColorHex,
+          ),
+        );
+      },
     );
   }
 }
 
 class DashboardScreen extends StatefulWidget {
+  final FlagForgeClient client;
   final bool darkMode;
   final bool premiumTheme;
   final bool showBanner;
   final String bannerMessage;
   final Color accentColor;
   final String accentColorHex;
-  final VoidCallback onToggleDarkMode;
-  final VoidCallback onTogglePremiumTheme;
-  final VoidCallback onToggleShowBanner;
-  final ValueChanged<String> onUpdateBannerMessage;
-  final ValueChanged<String> onUpdateAccentColor;
 
   const DashboardScreen({
     super.key,
+    required this.client,
     required this.darkMode,
     required this.premiumTheme,
     required this.showBanner,
     required this.bannerMessage,
     required this.accentColor,
     required this.accentColorHex,
-    required this.onToggleDarkMode,
-    required this.onTogglePremiumTheme,
-    required this.onToggleShowBanner,
-    required this.onUpdateBannerMessage,
-    required this.onUpdateAccentColor,
   });
 
   @override
@@ -127,6 +123,41 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int _currentIndex = 0;
+  late final TextEditingController _textController;
+  late final TextEditingController _colorController;
+
+  @override
+  void initState() {
+    super.initState();
+    _textController = TextEditingController(text: widget.bannerMessage);
+    _colorController = TextEditingController(text: widget.accentColorHex);
+  }
+
+  @override
+  void didUpdateWidget(covariant DashboardScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.bannerMessage != _textController.text && !_textController.value.isComposingRangeValid) {
+      final oldSelection = _textController.selection;
+      _textController.text = widget.bannerMessage;
+      if (oldSelection.isValid && oldSelection.end <= widget.bannerMessage.length) {
+        _textController.selection = oldSelection;
+      }
+    }
+    if (widget.accentColorHex != _colorController.text && !_colorController.value.isComposingRangeValid) {
+      final oldSelection = _colorController.selection;
+      _colorController.text = widget.accentColorHex;
+      if (oldSelection.isValid && oldSelection.end <= widget.accentColorHex.length) {
+        _colorController.selection = oldSelection;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    _colorController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -180,7 +211,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'STATIC SKELETON',
+                  'LIVE SDK CLIENT',
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
@@ -360,12 +391,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '📍 Offline Sandbox Instructions',
+                    '📍 Local Cache Active',
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textColor),
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'This is a static visual skeleton layout. Navigate to the Feature Flags or Configs tabs at the bottom to toggle styles locally and preview changes in real time.',
+                    'This screen is connected directly to the FlagForgeClient local cache map. Navigate to the Feature Flags or Configs tabs to toggle styles, modify configurations, and see updates instantly reflected.',
                     style: TextStyle(fontSize: 12, color: subtitleColor, height: 1.5),
                   ),
                 ],
@@ -419,21 +450,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
           title: 'dark_mode',
           description: 'Alters global layout theme to dark.',
           value: widget.darkMode,
-          onChanged: (_) => widget.onToggleDarkMode(),
+          onChanged: (val) => widget.client.setFlag('dark_mode', val),
         ),
         const Divider(),
         _buildSwitchTile(
           title: 'premium_theme',
           description: 'Enables high-fidelity purple gradient background on card.',
           value: widget.premiumTheme,
-          onChanged: (_) => widget.onTogglePremiumTheme(),
+          onChanged: (val) => widget.client.setFlag('premium_theme', val),
         ),
         const Divider(),
         _buildSwitchTile(
           title: 'show_banner',
           description: 'Toggle visibility of the dynamic top campaign banner.',
           value: widget.showBanner,
-          onChanged: (_) => widget.onToggleShowBanner(),
+          onChanged: (val) => widget.client.setFlag('show_banner', val),
         ),
       ],
     );
@@ -458,9 +489,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildConfigsTab(Color textColor, Color subtitleColor) {
-    final textController = TextEditingController(text: widget.bannerMessage);
-    final colorController = TextEditingController(text: widget.accentColorHex);
-
     return ListView(
       padding: const EdgeInsets.all(24.0),
       children: [
@@ -475,21 +503,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         const SizedBox(height: 24),
         TextField(
-          controller: textController,
+          controller: _textController,
           decoration: const InputDecoration(
             labelText: 'banner_message (string)',
             border: OutlineInputBorder(),
           ),
-          onChanged: (val) => widget.onUpdateBannerMessage(val),
+          onChanged: (val) => widget.client.setConfig('banner_message', val),
         ),
         const SizedBox(height: 24),
         TextField(
-          controller: colorController,
+          controller: _colorController,
           decoration: const InputDecoration(
             labelText: 'theme_accent_color (string hex)',
             border: OutlineInputBorder(),
           ),
-          onChanged: (val) => widget.onUpdateAccentColor(val),
+          onChanged: (val) => widget.client.setConfig('theme_accent_color', val),
         ),
       ],
     );

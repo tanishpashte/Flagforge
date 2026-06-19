@@ -23,6 +23,62 @@ class FlagForgeClient extends ChangeNotifier {
 
   bool get isInitialized => _isInitialized;
 
+  // Read-only/direct access to cache maps
+  Map<String, dynamic> get flags => _flags;
+  Map<String, dynamic> get configs => _configs;
+
+  // Programmatic setters for local state updating and testing
+  void setFlag(String key, bool isEnabled) {
+    final existing = _flags[key];
+    if (existing is Map<String, dynamic>) {
+      final updated = Map<String, dynamic>.from(existing);
+      updated['is_enabled'] = isEnabled;
+      updated['updated_at'] = DateTime.now().toIso8601String();
+      _flags[key] = updated;
+    } else if (existing is FeatureFlag) {
+      _flags[key] = existing.copyWith(
+        isEnabled: isEnabled,
+        updatedAt: DateTime.now(),
+      );
+    } else {
+      _flags[key] = {
+        'key': key,
+        'is_enabled': isEnabled,
+        'description': 'Locally set flag',
+        'project_id': 0,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+    }
+    notifyListeners();
+  }
+
+  void setConfig(String key, String value, {String valueType = 'string'}) {
+    final existing = _configs[key];
+    if (existing is Map<String, dynamic>) {
+      final updated = Map<String, dynamic>.from(existing);
+      updated['value'] = value;
+      updated['value_type'] = valueType;
+      updated['updated_at'] = DateTime.now().toIso8601String();
+      _configs[key] = updated;
+    } else if (existing is RemoteConfig) {
+      _configs[key] = existing.copyWith(
+        value: value,
+        valueType: ConfigType.fromString(valueType),
+        updatedAt: DateTime.now(),
+      );
+    } else {
+      _configs[key] = {
+        'key': key,
+        'value': value,
+        'value_type': valueType,
+        'description': 'Locally set config',
+        'project_id': 0,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+    }
+    notifyListeners();
+  }
+
   // Clean getter for evaluated flags
   bool isEnabled(String key, {bool defaultValue = false}) {
     final flag = _flags[key];
