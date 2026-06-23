@@ -3,11 +3,21 @@ import 'package:flutter/material.dart';
 import 'flagforge_sdk.dart';
 
 void main() {
-  runApp(const FlagForgeExampleApp());
+  runApp(const FlagForgeExampleApp(
+    useLiveConnection: true,
+    useMockTimer: false,
+  ));
 }
 
 class FlagForgeExampleApp extends StatefulWidget {
-  const FlagForgeExampleApp({super.key});
+  final bool useLiveConnection;
+  final bool useMockTimer;
+
+  const FlagForgeExampleApp({
+    super.key,
+    this.useLiveConnection = false,
+    this.useMockTimer = true,
+  });
 
   @override
   State<FlagForgeExampleApp> createState() => _FlagForgeExampleAppState();
@@ -21,23 +31,30 @@ class _FlagForgeExampleAppState extends State<FlagForgeExampleApp> {
   @override
   void initState() {
     super.initState();
-    // Default mock data to populate client cache map
+    // Default fallback mock data to populate client cache map before hydration
     _client.setFlag('dark_mode', true);
     _client.setFlag('premium_theme', false);
     _client.setFlag('show_banner', true);
     _client.setConfig('banner_message', 'Welcome to FlagForge Client-Side Cache Injection!');
     _client.setConfig('theme_accent_color', '#89B4FA');
 
-    // Simulate real-time local update to verify visual transformations
-    _mockUpdateTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted) {
-        _client.setFlag('premium_theme', true);
-        _client.setConfig(
-          'banner_message',
-          'UI successfully transformed via local client state update!',
-        );
-      }
-    });
+    if (widget.useLiveConnection) {
+      // Call initialize on boot to hit backend API, open WebSocket connection, and receive dynamic updates
+      _client.initialize(1);
+    }
+
+    if (widget.useMockTimer) {
+      // Simulate real-time local update to verify visual transformations
+      _mockUpdateTimer = Timer(const Duration(seconds: 3), () {
+        if (mounted) {
+          _client.setFlag('premium_theme', true);
+          _client.setConfig(
+            'banner_message',
+            'UI successfully transformed via local client state update!',
+          );
+        }
+      });
+    }
   }
 
   @override
