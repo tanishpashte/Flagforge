@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 from typing import List
 from datetime import datetime
-from backend.app.database import get_session
+from backend.app.database import get_session, update_remote_config
+from pydantic import BaseModel
 from backend.app.models import RemoteConfig, RemoteConfigBase
 from backend.app.ws_manager import manager
 
@@ -77,3 +78,14 @@ async def delete_config(config_id: int, session: Session = Depends(get_session))
         "action": "delete"
     })
     return None
+
+class ConfigUpdateValue(BaseModel):
+    value: str
+
+@router.put("/{key}", response_model=RemoteConfig)
+async def update_config_by_key(key: str, update_data: ConfigUpdateValue):
+    try:
+        updated_config = await update_remote_config(key, update_data.value)
+        return updated_config
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
