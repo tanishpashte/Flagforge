@@ -95,3 +95,31 @@ def init_db():
 def get_session():
     with Session(engine) as session:
         yield session
+
+async def update_remote_config(key: str, value: str):
+    from sqlmodel import select
+    from backend.app.models import RemoteConfig
+    from backend.app.ws_manager import manager
+    from datetime import datetime
+    
+    with Session(engine) as session:
+        statement = select(RemoteConfig).where(RemoteConfig.key == key)
+        db_config = session.exec(statement).first()
+        if not db_config:
+            raise ValueError(f"Configuration with key '{key}' not found.")
+            
+        db_config.value = value
+        db_config.updated_at = datetime.utcnow()
+        session.add(db_config)
+        session.commit()
+        session.refresh(db_config)
+        
+        await manager.broadcast_to_project(db_config.project_id, {
+            "type": "config",
+            "key": db_config.key,
+            "value_type": db_config.value_type,
+            "value": db_config.value,
+            "action": "update"
+        })
+        
+        return db_config
