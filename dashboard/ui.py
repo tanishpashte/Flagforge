@@ -11,7 +11,8 @@ import httpx
 from textual import events
 from textual.app import App, ComposeResult
 from textual.containers import Grid, Horizontal, Vertical
-from textual.widgets import Footer, Input, Label, ListItem, ListView, Static
+from textual.screen import ModalScreen
+from textual.widgets import Button, Footer, Input, Label, ListItem, ListView, Static
 
 
 class ClockWidget(Static):
@@ -97,7 +98,26 @@ class RemoteConfigItem(ListItem):
             val_color = "#89dceb"
             val_str = f'"{val_str}"'
         
-        yield Label(f"[#b4befe]{icon}[/]  [bold #cdd6f4]{self.config_key}[/]: [{val_color}]{val_str}[/]")
+        yield Label(
+            f"[#b4befe]{icon}[/]  [bold #cdd6f4]{self.config_key}[/]: [{val_color}]{val_str}[/]",
+            id="config-label"
+        )
+
+    def update_state(self, new_value: Any) -> None:
+        """Update the configuration item's value and refresh its label in the UI."""
+        self.config_value = new_value
+        icon = "⚙"
+        val_str = str(self.config_value)
+        if isinstance(self.config_value, bool):
+            val_color = "#a6e3a1" if self.config_value else "#f38ba8"
+        elif isinstance(self.config_value, int):
+            val_color = "#f9e2af"
+        else:
+            val_color = "#89dceb"
+            val_str = f'"{val_str}"'
+        
+        label = self.query_one("#config-label", Label)
+        label.update(f"[#b4befe]{icon}[/]  [bold #cdd6f4]{self.config_key}[/]: [{val_color}]{val_str}[/]")
 
 
 class ProjectsList(ListView):
@@ -125,6 +145,47 @@ class RemoteConfigsList(ListView):
         super().__init__(id="remote-configs-list")
         self.border_title = "⚙ REMOTE CONFIGS"
         self.border_subtitle = "0 items"
+
+
+class ConfigEditModal(ModalScreen):
+    """A modal dialog to edit a remote configuration value."""
+
+    BINDINGS = [
+        ("escape", "cancel", "Cancel"),
+    ]
+
+    def __init__(self, key: str, value: Any) -> None:
+        super().__init__()
+        self.config_key = key
+        self.config_value = str(value)
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="modal-dialog"):
+            yield Label(f"Editing: [bold #89b4fa]{self.config_key}[/]", id="modal-label")
+            yield Input(value=self.config_value, id="modal-input")
+            with Horizontal(id="modal-buttons"):
+                yield Button("Save", variant="success", id="modal-save")
+                yield Button("Cancel", variant="error", id="modal-cancel")
+
+    def on_mount(self) -> None:
+        self.query_one("#modal-input", Input).focus()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "modal-save":
+            self.save_config()
+        elif event.button.id == "modal-cancel":
+            self.dismiss(None)
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id == "modal-input":
+            self.save_config()
+
+    def save_config(self) -> None:
+        new_value = self.query_one("#modal-input", Input).value
+        self.dismiss(new_value)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
 
 
 class FlagForgeApp(App):
@@ -222,6 +283,45 @@ class FlagForgeApp(App):
         if event.input.id == "search-bar":
             search_query = event.value.strip().lower()
             self.filter_lists(search_query)
+
+    def on_list_view_selected(self, event: ListView.Selected) -> None:
+        """Handle item selection in list views."""
+        item = event.item
+        if isinstance(item, RemoteConfigItem):
+            self.edit_remote_config(item)
+
+    def edit_remote_config(self, item: RemoteConfigItem) -> None:
+        """Open the configuration edit modal for the selected item."""
+        def handle_edit_result(new_value: str | None) -> None:
+            if new_value is not None and new_value != str(item.config_value):
+                self.run_worker(self.update_remote_config_value(item, new_value))
+
+        self.push_screen(ConfigEditModal(item.config_key, item.config_value), handle_edit_result)
+
+    async def update_remote_config_value(self, item: RemoteConfigItem, new_value: str) -> None:
+        """Send asynchronous HTTP PUT request to backend to update the config value."""
+        try:
+            async with httpx.AsyncClient(base_url="http://localhost:8000") as client:
+                response = await client.put(
+                    f"/api/configs/{item.config_key}",
+                    json={"value": new_value}
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    item.update_state(data["value"])
+                    self.notify(
+                        f"Config '{item.config_key}' updated to '{data['value']}'",
+                        title="Mutation Successful",
+                        severity="information"
+                    )
+                else:
+                    self.notify(
+                        f"Failed to update config: {response.status_code}",
+                        title="Mutation Failed",
+                        severity="error"
+                    )
+        except Exception as e:
+            self.notify(f"Connection error: {e}", title="Network Error", severity="error")
 
     def filter_lists(self, query: str) -> None:
         """Filter feature flags and configs based on search query."""

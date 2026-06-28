@@ -115,3 +115,47 @@ ListItem:focus {
 ListView > ListItem {
     border: none;
 }
+
+/* Modal dialog styling */
+ConfigEditModal {
+    align: center middle;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+#modal-dialog {
+    width: 60;
+    height: auto;
+    border: thick $border-active;
+    background: $surface;
+    padding: 1 2;
+}
+
+#modal-label {
+    margin-top: 1;
+    margin-bottom: 1;
+    width: 100%;
+    content-align: center middle;
+}
+
+#modal-input {
+    margin-bottom: 1;
+    background: $background;
+    border: tall $border-inactive;
+    color: $text;
+}
+
+#modal-input:focus {
+    border: tall $border-active;
+}
+
+#modal-buttons {
+    layout: horizontal;
+    align: center middle;
+    height: 3;
+    content-align: center middle;
+}
+
+#modal-buttons Button {
+    margin: 0 2;
+    width: 15;
+}
