@@ -103,12 +103,20 @@ ListItem {
     background: transparent;
     color: $text;
     height: auto;
+    border-left: solid transparent;
 }
 
-ListItem:focus {
+ListView > ListItem.-highlight {
+    background: #181825;
+    color: $text-muted;
+    border-left: solid #313244;
+}
+
+ListView:focus > ListItem.-highlight {
     background: #313244;
-    color: #ffffff;
+    color: #cdd6f4;
     text-style: bold;
+    border-left: solid $accent;
 }
 
 /* Disable default ListView border when focused to avoid double border */
