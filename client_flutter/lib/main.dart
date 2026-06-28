@@ -115,13 +115,35 @@ class Product {
 }
 
 class ECommerceDashboard extends StatefulWidget {
-  const ECommerceDashboard({super.key});
+  final String? welcomeMessage;
+  final bool? showSpecialOffer;
+  final bool? showChatbot;
+
+  const ECommerceDashboard({
+    super.key,
+    this.welcomeMessage,
+    this.showSpecialOffer,
+    this.showChatbot,
+  });
 
   @override
   State<ECommerceDashboard> createState() => _ECommerceDashboardState();
 }
 
 class _ECommerceDashboardState extends State<ECommerceDashboard> {
+  // Local state mapping
+  late String welcomeMessage;
+  late bool showSpecialOffer;
+  late bool showChatbot;
+
+  @override
+  void initState() {
+    super.initState();
+    welcomeMessage = widget.welcomeMessage ?? "Welcome to our shop!";
+    showSpecialOffer = widget.showSpecialOffer ?? false;
+    showChatbot = widget.showChatbot ?? false;
+  }
+
   // Static mock items
   static const List<Product> _products = [
     Product(
@@ -219,6 +241,19 @@ class _ECommerceDashboardState extends State<ECommerceDashboard> {
           children: [
             // Minimal Divider
             Container(height: 1, color: borderColor),
+
+            // Greeting Widget
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+              child: Text(
+                welcomeMessage,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: isDark ? Colors.white70 : Colors.black87,
+                ),
+              ),
+            ),
             
             // Search Input
             Padding(
@@ -300,6 +335,40 @@ class _ECommerceDashboardState extends State<ECommerceDashboard> {
                 }).toList(),
               ),
             ),
+
+            if (showSpecialOffer)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFF0055), Color(0xFFFF5500)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.local_offer_outlined, color: Colors.white, size: 20),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'SPECIAL OFFER: Use code ESSENTIALS20 for 20% off!',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
 
             // Catalog grid feed
             Expanded(
@@ -436,6 +505,54 @@ class _ECommerceDashboardState extends State<ECommerceDashboard> {
           ],
         ),
       ),
+      floatingActionButton: showChatbot
+          ? FloatingActionButton(
+              onPressed: () => _showChatbotDialog(context),
+              backgroundColor: isDark ? Colors.white : Colors.black,
+              foregroundColor: isDark ? Colors.black : Colors.white,
+              child: const Icon(Icons.chat_bubble_outline),
+            )
+          : null,
+    );
+  }
+
+  void _showChatbotDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFFFFFFF),
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(
+              color: isDark ? const Color(0xFF282828) : const Color(0xFFE2E2E2),
+            ),
+          ),
+          title: const Text(
+            'SHOP ASSISTANT',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.0,
+            ),
+          ),
+          content: const Text('Hello! How can I assist you with your order today?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'CLOSE',
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 

@@ -72,4 +72,31 @@ void main() {
 
     await tester.binding.setSurfaceSize(null);
   });
+
+  testWidgets('E-Commerce app conditional flags render correctly when enabled', (WidgetTester tester) async {
+    // Pump app with custom state mapping values
+    await tester.pumpWidget(const MaterialApp(
+      home: ECommerceDashboard(
+        welcomeMessage: 'Special Welcome Greeting!',
+        showSpecialOffer: true,
+        showChatbot: true,
+      ),
+    ));
+
+    // 1. Verify custom welcomeMessage is rendered
+    expect(find.text('Special Welcome Greeting!'), findsOneWidget);
+
+    // 2. Verify special offer banner is visible
+    expect(find.text('SPECIAL OFFER: Use code ESSENTIALS20 for 20% off!'), findsOneWidget);
+
+    // 3. Verify chatbot FAB is visible and triggers dialog
+    final chatbotFinder = find.byType(FloatingActionButton);
+    expect(chatbotFinder, findsOneWidget);
+
+    await tester.tap(chatbotFinder);
+    await tester.pumpAndSettle();
+
+    expect(find.text('SHOP ASSISTANT'), findsOneWidget);
+    expect(find.text('Hello! How can I assist you with your order today?'), findsOneWidget);
+  });
 }
