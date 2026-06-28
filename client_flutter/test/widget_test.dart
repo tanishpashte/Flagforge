@@ -1,29 +1,75 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:client_flutter/main.dart';
 
 void main() {
-  testWidgets('FlagForge static app mounts and displays title', (WidgetTester tester) async {
+  testWidgets('E-Commerce app mounts and displays shop name header', (WidgetTester tester) async {
     // Pump the app
-    await tester.pumpWidget(const FlagForgeExampleApp());
+    await tester.pumpWidget(const ECommerceApp());
 
-    // Verify that the title or header is found
-    expect(find.text('FLAGFORGE SHELL'), findsOneWidget);
+    // Verify that the title / shop name is displayed
+    expect(find.text('STUDIO ESSENTIALS'), findsOneWidget);
   });
 
-  testWidgets('UI visually transforms when client state changes', (WidgetTester tester) async {
+  testWidgets('E-Commerce app displays mock products in catalog feed', (WidgetTester tester) async {
+    // Adjust surface size so all grid items are loaded and visible in test tree
+    await tester.binding.setSurfaceSize(const Size(800, 1200));
+
     // Pump the app
-    await tester.pumpWidget(const FlagForgeExampleApp());
+    await tester.pumpWidget(const ECommerceApp());
 
-    // Initially premium_theme should be false (Standard Client Card is shown)
-    expect(find.text('📱 STANDARD CLIENT CARD'), findsOneWidget);
-    expect(find.text('💎 PREMIUM CLIENT CARD'), findsNothing);
+    // Verify all mock product names exist in the catalog feed
+    expect(find.text('Studio Headset Mono'), findsOneWidget);
+    expect(find.text('Minimalist Commuter Pack'), findsOneWidget);
+    expect(find.text('Mechanical Keyboard 60%'), findsOneWidget);
+    expect(find.text('Anodized Desk Lamp'), findsOneWidget);
 
-    // Pump for 3 seconds to fire the timer
-    await tester.pump(const Duration(seconds: 3));
+    // Reset surface size
+    await tester.binding.setSurfaceSize(null);
+  });
 
-    // After 3 seconds, premium_theme is true, card switches to premium, and banner message updates
-    expect(find.text('💎 PREMIUM CLIENT CARD'), findsOneWidget);
-    expect(find.text('📱 STANDARD CLIENT CARD'), findsNothing);
-    expect(find.text('UI successfully transformed via local client state update!'), findsOneWidget);
+  testWidgets('Clicking a product card opens a bottom sheet with detailed description', (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1200));
+    
+    // Pump the app
+    await tester.pumpWidget(const ECommerceApp());
+
+    // Tap on the first product (Studio Headset Mono)
+    await tester.tap(find.text('Studio Headset Mono'));
+    await tester.pumpAndSettle(); // Wait for bottom sheet animation to complete
+
+    // Verify that description text inside the bottom sheet is present
+    expect(find.text('Active noise cancelling wireless headset. Pure sound, architectural geometry.'), findsOneWidget);
+    expect(find.text('ADD TO CART'), findsOneWidget);
+
+    await tester.binding.setSurfaceSize(null);
+  });
+
+  testWidgets('Adding product to cart updates shopping bag badge count', (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1200));
+
+    // Pump the app
+    await tester.pumpWidget(const ECommerceApp());
+
+    // Initially, badge should not be visible (cart is empty)
+    expect(find.text('1'), findsNothing);
+
+    // Tap the 'add' icon button for the first item (Studio Headset Mono)
+    final addButtonFinder = find.descendant(
+      of: find.ancestor(
+        of: find.text('Studio Headset Mono'),
+        matching: find.byType(Container),
+      ),
+      matching: find.byIcon(Icons.add),
+    );
+
+    expect(addButtonFinder, findsOneWidget);
+    await tester.tap(addButtonFinder);
+    await tester.pump(); // trigger state rebuild
+
+    // Verify badge showing count of '1' is displayed near the bag icon
+    expect(find.text('1'), findsOneWidget);
+
+    await tester.binding.setSurfaceSize(null);
   });
 }

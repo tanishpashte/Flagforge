@@ -1,542 +1,705 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'flagforge_sdk.dart';
 
 void main() {
-  runApp(const FlagForgeExampleApp(
-    useLiveConnection: true,
-    useMockTimer: false,
-  ));
+  runApp(const ECommerceApp());
 }
 
-class FlagForgeExampleApp extends StatefulWidget {
-  final bool useLiveConnection;
-  final bool useMockTimer;
-
-  const FlagForgeExampleApp({
-    super.key,
-    this.useLiveConnection = false,
-    this.useMockTimer = true,
-  });
-
-  @override
-  State<FlagForgeExampleApp> createState() => _FlagForgeExampleAppState();
-}
-
-class _FlagForgeExampleAppState extends State<FlagForgeExampleApp> {
-  // Instantiate FlagForgeClient
-  final FlagForgeClient _client = FlagForgeClient();
-  Timer? _mockUpdateTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    // Default fallback mock data to populate client cache map before hydration
-    _client.setFlag('dark_mode', true);
-    _client.setFlag('premium_theme', false);
-    _client.setFlag('show_banner', true);
-    _client.setConfig('banner_message', 'Welcome to FlagForge Client-Side Cache Injection!');
-    _client.setConfig('theme_accent_color', '#89B4FA');
-
-    if (widget.useLiveConnection) {
-      // Call initialize on boot to hit backend API, open WebSocket connection, and receive dynamic updates
-      _client.initialize(1);
-    }
-
-    if (widget.useMockTimer) {
-      // Simulate real-time local update to verify visual transformations
-      _mockUpdateTimer = Timer(const Duration(seconds: 3), () {
-        if (mounted) {
-          _client.setFlag('premium_theme', true);
-          _client.setConfig(
-            'banner_message',
-            'UI successfully transformed via local client state update!',
-          );
-        }
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _mockUpdateTimer?.cancel();
-    _client.dispose();
-    super.dispose();
-  }
+class ECommerceApp extends StatelessWidget {
+  const ECommerceApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: _client,
-      builder: (context, child) {
-        final darkMode = _client.isEnabled('dark_mode', defaultValue: true);
-        final premiumTheme = _client.isEnabled('premium_theme', defaultValue: false);
-        final showBanner = _client.isEnabled('show_banner', defaultValue: true);
-        final bannerMessage = _client.getConfigValue('banner_message', defaultValue: 'Welcome to FlagForge Static Preview!');
-        final accentColorHex = _client.getConfigValue('theme_accent_color', defaultValue: '#89B4FA');
+    return MaterialApp(
+      title: 'Studio Essentials',
+      debugShowCheckedModeBanner: false,
+      themeMode: ThemeMode.system,
+      theme: ThemeData(
+        brightness: Brightness.light,
+        scaffoldBackgroundColor: const Color(0xFFFFFFFF),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFFFFFFFF),
+          elevation: 0,
+          iconTheme: IconThemeData(color: Color(0xFF000000)),
+          titleTextStyle: TextStyle(
+            color: Color(0xFF000000),
+            fontFamily: 'SpaceGrotesk',
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.5,
+          ),
+        ),
+        colorScheme: const ColorScheme.light(
+          primary: Color(0xFF000000),
+          secondary: Color(0xFF757575),
+          surface: Color(0xFFF6F6F6),
+        ),
+        textTheme: const TextTheme(
+          titleLarge: TextStyle(
+            color: Color(0xFF000000),
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
+          bodyMedium: TextStyle(
+            color: Color(0xFF000000),
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+          ),
+          bodySmall: TextStyle(
+            color: Color(0xFF757575),
+            fontSize: 12,
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+      ),
+      darkTheme: ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF0A0A0A),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF0A0A0A),
+          elevation: 0,
+          iconTheme: IconThemeData(color: Color(0xFFFFFFFF)),
+          titleTextStyle: TextStyle(
+            color: Color(0xFFFFFFFF),
+            fontFamily: 'SpaceGrotesk',
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.5,
+          ),
+        ),
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFFFFFFFF),
+          secondary: Color(0xFF9E9E9E),
+          surface: Color(0xFF161616),
+        ),
+        textTheme: const TextTheme(
+          titleLarge: TextStyle(
+            color: Color(0xFFFFFFFF),
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
+          bodyMedium: TextStyle(
+            color: Color(0xFFFFFFFF),
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+          ),
+          bodySmall: TextStyle(
+            color: Color(0xFF9E9E9E),
+            fontSize: 12,
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+      ),
+      home: const ECommerceDashboard(),
+    );
+  }
+}
 
-        // Dynamically parse hex color
-        Color accentColor = const Color(0xFF89B4FA);
-        try {
-          final hex = accentColorHex.replaceAll('#', '');
-          if (hex.length == 6) {
-            accentColor = Color(int.parse('FF$hex', radix: 16));
-          } else if (hex.length == 8) {
-            accentColor = Color(int.parse(hex, radix: 16));
-          }
-        } catch (_) {}
+class Product {
+  final String id;
+  final String name;
+  final String category;
+  final double price;
+  final String description;
+  final IconData icon;
 
-        return MaterialApp(
-          title: 'FlagForge SDK Shell',
-          debugShowCheckedModeBanner: false,
-          theme: ThemeData(
-            useMaterial3: true,
-            brightness: darkMode ? Brightness.dark : Brightness.light,
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: accentColor,
-              brightness: darkMode ? Brightness.dark : Brightness.light,
-              surface: darkMode ? const Color(0xFF0F0F1A) : const Color(0xFFF4F5FA),
+  const Product({
+    required this.id,
+    required this.name,
+    required this.category,
+    required this.price,
+    required this.description,
+    required this.icon,
+  });
+}
+
+class ECommerceDashboard extends StatefulWidget {
+  const ECommerceDashboard({super.key});
+
+  @override
+  State<ECommerceDashboard> createState() => _ECommerceDashboardState();
+}
+
+class _ECommerceDashboardState extends State<ECommerceDashboard> {
+  // Static mock items
+  static const List<Product> _products = [
+    Product(
+      id: 'p1',
+      name: 'Studio Headset Mono',
+      category: 'Electronics',
+      price: 299.00,
+      description: 'Active noise cancelling wireless headset. Pure sound, architectural geometry.',
+      icon: Icons.headphones_outlined,
+    ),
+    Product(
+      id: 'p2',
+      name: 'Minimalist Commuter Pack',
+      category: 'Clothing',
+      price: 149.00,
+      description: 'Water-resistant rolltop bag with modular compartments and custom aluminum hardware.',
+      icon: Icons.backpack_outlined,
+    ),
+    Product(
+      id: 'p3',
+      name: 'Mechanical Keyboard 60%',
+      category: 'Electronics',
+      price: 189.00,
+      description: 'Tactile hot-swappable mechanical switches with solid anodized chassis.',
+      icon: Icons.keyboard_outlined,
+    ),
+    Product(
+      id: 'p4',
+      name: 'Anodized Desk Lamp',
+      category: 'Living',
+      price: 89.00,
+      description: 'Dimmable warm LED fixture constructed from sandblasted aluminum components.',
+      icon: Icons.light_outlined,
+    ),
+  ];
+
+  final Set<String> _cart = {};
+  String _selectedCategory = 'All';
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final borderColor = isDark ? const Color(0xFF282828) : const Color(0xFFE2E2E2);
+    final cardBgColor = isDark ? const Color(0xFF121212) : const Color(0xFFFAFAFA);
+
+    // Filter items based on selected category
+    final filteredProducts = _selectedCategory == 'All'
+        ? _products
+        : _products.where((p) => p.category == _selectedCategory).toList();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('STUDIO ESSENTIALS'),
+        actions: [
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.shopping_bag_outlined, size: 24),
+                onPressed: () => _showCartDialog(context),
+              ),
+              if (_cart.isNotEmpty)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.black,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      '${_cart.length}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Minimal Divider
+            Container(height: 1, color: borderColor),
+            
+            // Search Input
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Container(
+                height: 48,
+                decoration: BoxDecoration(
+                  border: Border.all(color: borderColor, width: 1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Row(
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 14),
+                      child: Icon(Icons.search, size: 20, color: Colors.grey),
+                    ),
+                    Expanded(
+                      child: TextField(
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black,
+                          fontSize: 14,
+                        ),
+                        decoration: const InputDecoration(
+                          hintText: 'Search catalog...',
+                          hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
+                          border: InputBorder.none,
+                          isDense: true,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            fontFamily: 'Outfit',
-          ),
-          home: DashboardScreen(
-            client: _client,
-            darkMode: darkMode,
-            premiumTheme: premiumTheme,
-            showBanner: showBanner,
-            bannerMessage: bannerMessage,
-            accentColor: accentColor,
-            accentColorHex: accentColorHex,
-          ),
+
+            // Category Selector Chips
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                children: ['All', 'Electronics', 'Clothing', 'Living'].map((category) {
+                  final isSelected = _selectedCategory == category;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedCategory = category;
+                        });
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? (isDark ? Colors.white : Colors.black)
+                              : Colors.transparent,
+                          border: Border.all(
+                            color: isSelected
+                                ? (isDark ? Colors.white : Colors.black)
+                                : borderColor,
+                            width: 1,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          category,
+                          style: TextStyle(
+                            color: isSelected
+                                ? (isDark ? Colors.black : Colors.white)
+                                : (isDark ? Colors.white70 : Colors.black87),
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+
+            // Catalog grid feed
+            Expanded(
+              child: GridView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 0.68,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                ),
+                itemCount: filteredProducts.length,
+                itemBuilder: (context, index) {
+                  final product = filteredProducts[index];
+                  final isInCart = _cart.contains(product.id);
+
+                  return GestureDetector(
+                    onTap: () => _showProductDetails(context, product),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: cardBgColor,
+                        border: Border.all(color: borderColor, width: 1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Graphic Frame box representing product image
+                          Expanded(
+                            flex: 4,
+                            child: Container(
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF0F0F0),
+                                borderRadius: const BorderRadius.only(
+                                  topLeft: Radius.circular(7),
+                                  topRight: Radius.circular(7),
+                                ),
+                              ),
+                              child: Hero(
+                                tag: 'product-icon-${product.id}',
+                                child: Icon(
+                                  product.icon,
+                                  size: 44,
+                                  color: isDark ? Colors.white38 : Colors.black38,
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Content Info
+                          Expanded(
+                            flex: 3,
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        product.name,
+                                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        product.category.toUpperCase(),
+                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                          letterSpacing: 1.0,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        '\$${product.price.toStringAsFixed(2)}',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: isDark ? Colors.white : Colors.black,
+                                        ),
+                                      ),
+                                      GestureDetector(
+                                        onTap: () {
+                                          setState(() {
+                                            if (isInCart) {
+                                              _cart.remove(product.id);
+                                            } else {
+                                              _cart.add(product.id);
+                                            }
+                                          });
+                                        },
+                                        child: AnimatedContainer(
+                                          duration: const Duration(milliseconds: 200),
+                                          padding: const EdgeInsets.all(6),
+                                          decoration: BoxDecoration(
+                                            color: isInCart
+                                                ? (isDark ? Colors.white24 : Colors.black12)
+                                                : (isDark ? Colors.white : Colors.black),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Icon(
+                                            isInCart ? Icons.check : Icons.add,
+                                            size: 14,
+                                            color: isInCart
+                                                ? (isDark ? Colors.white : Colors.black)
+                                                : (isDark ? Colors.black : Colors.white),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showProductDetails(BuildContext context, Product product) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final sheetBgColor = isDark ? const Color(0xFF121212) : const Color(0xFFFFFFFF);
+        final accentColor = isDark ? Colors.white : Colors.black;
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final isInCart = _cart.contains(product.id);
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.7,
+              decoration: BoxDecoration(
+                color: sheetBgColor,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                ),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withAlpha(128),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            height: 180,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF0F0F0),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Hero(
+                              tag: 'product-icon-${product.id}',
+                              child: Icon(
+                                product.icon,
+                                size: 80,
+                                color: isDark ? Colors.white38 : Colors.black38,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          Text(
+                            product.category.toUpperCase(),
+                            style: TextStyle(
+                              letterSpacing: 1.5,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? Colors.white60 : Colors.black54,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            product.name,
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '\$${product.price.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          Text(
+                            product.description,
+                            style: TextStyle(
+                              fontSize: 15,
+                              height: 1.6,
+                              color: isDark ? Colors.white70 : Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 54,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          if (isInCart) {
+                            _cart.remove(product.id);
+                          } else {
+                            _cart.add(product.id);
+                          }
+                        });
+                        setModalState(() {});
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: accentColor,
+                        foregroundColor: isDark ? Colors.black : Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Text(
+                        isInCart ? 'REMOVE FROM CART' : 'ADD TO CART',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         );
       },
     );
   }
-}
 
-class DashboardScreen extends StatefulWidget {
-  final FlagForgeClient client;
-  final bool darkMode;
-  final bool premiumTheme;
-  final bool showBanner;
-  final String bannerMessage;
-  final Color accentColor;
-  final String accentColorHex;
+  void _showCartDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final cartProducts = _products.where((p) => _cart.contains(p.id)).toList();
 
-  const DashboardScreen({
-    super.key,
-    required this.client,
-    required this.darkMode,
-    required this.premiumTheme,
-    required this.showBanner,
-    required this.bannerMessage,
-    required this.accentColor,
-    required this.accentColorHex,
-  });
-
-  @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
-}
-
-class _DashboardScreenState extends State<DashboardScreen> {
-  int _currentIndex = 0;
-  late final TextEditingController _textController;
-  late final TextEditingController _colorController;
-
-  @override
-  void initState() {
-    super.initState();
-    _textController = TextEditingController(text: widget.bannerMessage);
-    _colorController = TextEditingController(text: widget.accentColorHex);
-  }
-
-  @override
-  void didUpdateWidget(covariant DashboardScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.bannerMessage != _textController.text && !_textController.value.isComposingRangeValid) {
-      final oldSelection = _textController.selection;
-      _textController.text = widget.bannerMessage;
-      if (oldSelection.isValid && oldSelection.end <= widget.bannerMessage.length) {
-        _textController.selection = oldSelection;
-      }
-    }
-    if (widget.accentColorHex != _colorController.text && !_colorController.value.isComposingRangeValid) {
-      final oldSelection = _colorController.selection;
-      _colorController.text = widget.accentColorHex;
-      if (oldSelection.isValid && oldSelection.end <= widget.accentColorHex.length) {
-        _colorController.selection = oldSelection;
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _textController.dispose();
-    _colorController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final textColor = widget.darkMode ? const Color(0xFFE2E4F0) : const Color(0xFF2E303F);
-    final subtitleColor = widget.darkMode ? const Color(0xFF8A8DAB) : const Color(0xFF6E7191);
-
-    final pages = [
-      _buildOverviewTab(textColor, subtitleColor),
-      _buildFlagsTab(textColor, subtitleColor),
-      _buildConfigsTab(textColor, subtitleColor),
-    ];
-
-    return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: AppBar(
-        title: Row(
-          children: [
-            const Icon(Icons.bolt_rounded, color: Color(0xFFFFB600), size: 28),
-            const SizedBox(width: 6),
-            Text(
-              'FLAGFORGE SHELL',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.2,
-                color: textColor,
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: widget.darkMode ? const Color(0xFF0A0A12) : const Color(0xFFEBEBFF),
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 16),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.blue.withAlpha(26), // 0.1 opacity
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.blue.withAlpha(77), width: 1), // 0.3 opacity
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: Colors.blue,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'LIVE SDK CLIENT',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.blue[300] ?? Colors.blue,
-                  ),
-                ),
-              ],
+        return AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFFFFFFF),
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(
+              color: isDark ? const Color(0xFF282828) : const Color(0xFFE2E2E2),
             ),
           ),
-        ],
-      ),
-      body: pages[_currentIndex],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.dashboard_rounded),
-            label: 'Overview',
+          title: const Text(
+            'SHOPPING BAG',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.0,
+            ),
           ),
-          NavigationDestination(
-            icon: Icon(Icons.toggle_on_rounded),
-            label: 'Feature Flags',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_rounded),
-            label: 'Configs',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOverviewTab(Color textColor, Color subtitleColor) {
-    final isDark = widget.darkMode;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Banner preview if enabled
-          if (widget.showBanner) ...[
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              margin: const EdgeInsets.only(bottom: 24),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [widget.accentColor, widget.accentColor.withAlpha(179)], // 0.7 opacity
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: widget.accentColor.withAlpha(77), // 0.3 opacity
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  )
-                ],
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.campaign_rounded, color: Color(0xFF11111B), size: 28),
-                  const SizedBox(width: 12),
-                  Expanded(
+          content: cartProducts.isEmpty
+              ? const SizedBox(
+                  height: 100,
+                  child: Center(
                     child: Text(
-                      widget.bannerMessage,
-                      style: const TextStyle(
-                        color: Color(0xFF11111B),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
+                      'Your shopping bag is empty.',
+                      style: TextStyle(color: Colors.grey),
                     ),
                   ),
-                ],
-              ),
-            ),
-          ],
-
-          // Visual Sandbox Wrapper representing the dynamic styles
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 400),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: widget.premiumTheme
-                    ? [const Color(0xFF302B63), const Color(0xFF240B36)]
-                    : isDark
-                        ? [const Color(0xFF1B1B2F), const Color(0xFF252545)]
-                        : [Colors.white, const Color(0xFFECEBFF)],
-              ),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: widget.premiumTheme
-                    ? const Color(0xFFFFD54F)
-                    : widget.accentColor.withAlpha(77), // 0.3 opacity
-                width: widget.premiumTheme ? 2.0 : 1.0,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: widget.premiumTheme
-                      ? const Color(0xFFFFD54F).withAlpha(38) // 0.15 opacity
-                      : Colors.black.withAlpha(10), // 0.04 opacity
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            padding: const EdgeInsets.all(28.0),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.premiumTheme ? '💎 PREMIUM CLIENT CARD' : '📱 STANDARD CLIENT CARD',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
-                            color: widget.premiumTheme ? const Color(0xFFFFD54F) : textColor,
-                            letterSpacing: 0.5,
+                )
+              : SizedBox(
+                  width: double.maxFinite,
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: cartProducts.length,
+                    separatorBuilder: (context, index) => const Divider(height: 20),
+                    itemBuilder: (context, index) {
+                      final product = cartProducts[index];
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  product.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '\$${product.price.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Evaluates mock flag states locally',
-                          style: TextStyle(fontSize: 12, color: subtitleColor),
-                        ),
-                      ],
-                    ),
-                    if (widget.premiumTheme)
-                      const Icon(Icons.workspace_premium_rounded, color: Color(0xFFFFD54F), size: 32),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: textColor.withAlpha(10), // 0.04 opacity
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildIndicator(
-                        title: 'premium_theme',
-                        active: widget.premiumTheme,
-                        icon: Icons.palette_rounded,
-                      ),
-                      _buildIndicator(
-                        title: 'show_banner',
-                        active: widget.showBanner,
-                        icon: Icons.announcement_rounded,
-                      ),
-                    ],
+                          IconButton(
+                            icon: const Icon(Icons.remove_circle_outline, size: 20),
+                            onPressed: () {
+                              setState(() {
+                                _cart.remove(product.id);
+                              });
+                              Navigator.of(context).pop();
+                              _showCartDialog(context);
+                            },
+                          )
+                        ],
+                      );
+                    },
                   ),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Overview status message card
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            child: Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '📍 Local Cache Active',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textColor),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'This screen is connected directly to the FlagForgeClient local cache map. Navigate to the Feature Flags or Configs tabs to toggle styles, modify configurations, and see updates instantly reflected.',
-                    style: TextStyle(fontSize: 12, color: subtitleColor, height: 1.5),
-                  ),
-                ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'CLOSE',
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildIndicator({required String title, required bool active, required IconData icon}) {
-    final color = active ? const Color(0xFF00C853) : Colors.grey[500];
-
-    return Row(
-      children: [
-        Icon(icon, color: color, size: 20),
-        const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-            ),
-            Text(
-              active ? 'TRUE' : 'FALSE',
-              style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: color),
-            ),
+            if (cartProducts.isNotEmpty)
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isDark ? Colors.white : Colors.black,
+                  foregroundColor: isDark ? Colors.black : Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                onPressed: () {
+                  setState(() {
+                    _cart.clear();
+                  });
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Checkout successful! bag cleared.'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+                child: const Text('CHECKOUT'),
+              ),
           ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFlagsTab(Color textColor, Color subtitleColor) {
-    return ListView(
-      padding: const EdgeInsets.all(24.0),
-      children: [
-        Text(
-          ' Feature Flags (Mock)',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: textColor),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Tapping toggles their state in the layout instantly.',
-          style: TextStyle(fontSize: 12, color: subtitleColor),
-        ),
-        const SizedBox(height: 16),
-        _buildSwitchTile(
-          title: 'dark_mode',
-          description: 'Alters global layout theme to dark.',
-          value: widget.darkMode,
-          onChanged: (val) => widget.client.setFlag('dark_mode', val),
-        ),
-        const Divider(),
-        _buildSwitchTile(
-          title: 'premium_theme',
-          description: 'Enables high-fidelity purple gradient background on card.',
-          value: widget.premiumTheme,
-          onChanged: (val) => widget.client.setFlag('premium_theme', val),
-        ),
-        const Divider(),
-        _buildSwitchTile(
-          title: 'show_banner',
-          description: 'Toggle visibility of the dynamic top campaign banner.',
-          value: widget.showBanner,
-          onChanged: (val) => widget.client.setFlag('show_banner', val),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSwitchTile({
-    required String title,
-    required String description,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: SwitchListTile(
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(description),
-        value: value,
-        onChanged: onChanged,
-        contentPadding: EdgeInsets.zero,
-      ),
-    );
-  }
-
-  Widget _buildConfigsTab(Color textColor, Color subtitleColor) {
-    return ListView(
-      padding: const EdgeInsets.all(24.0),
-      children: [
-        Text(
-          '⚙ Remote Configs (Mock)',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: textColor),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Update remote configuration mock values below.',
-          style: TextStyle(fontSize: 12, color: subtitleColor),
-        ),
-        const SizedBox(height: 24),
-        TextField(
-          controller: _textController,
-          decoration: const InputDecoration(
-            labelText: 'banner_message (string)',
-            border: OutlineInputBorder(),
-          ),
-          onChanged: (val) => widget.client.setConfig('banner_message', val),
-        ),
-        const SizedBox(height: 24),
-        TextField(
-          controller: _colorController,
-          decoration: const InputDecoration(
-            labelText: 'theme_accent_color (string hex)',
-            border: OutlineInputBorder(),
-          ),
-          onChanged: (val) => widget.client.setConfig('theme_accent_color', val),
-        ),
-      ],
+        );
+      },
     );
   }
 }
