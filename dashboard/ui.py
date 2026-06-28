@@ -4,10 +4,13 @@ FlagForge TUI Dashboard
 A btop-inspired terminal user interface for managing projects, feature flags, and remote configurations.
 """
 
+import asyncio
 from datetime import datetime
+import json
 from typing import Any
 
 import httpx
+import websockets
 from textual import events
 from textual.app import App, ComposeResult
 from textual.containers import Grid, Horizontal, Vertical
@@ -194,6 +197,10 @@ class FlagForgeApp(App):
     CSS_PATH = "ui.tcss"
     TITLE = "FlagForge TUI Dashboard"
 
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.active_ws_projects = set()
+
     BINDINGS = [
         ("q", "quit", "Quit"),
         ("tab", "focus_next", "Next Panel"),
@@ -247,6 +254,13 @@ class FlagForgeApp(App):
                 # Populate UI lists
                 self.update_lists(projects, flags, configs)
                 self.notify("Successfully loaded data from backend.", title="Sync Complete", severity="information")
+
+                # Start WebSocket listeners for projects
+                for p in projects:
+                    p_id = p.get("id")
+                    if p_id is not None and p_id not in self.active_ws_projects:
+                        self.active_ws_projects.add(p_id)
+                        self.run_worker(self.listen_websocket(p_id))
         except Exception as e:
             self.notify(f"Could not connect to backend: {e}", title="Offline Mode", severity="warning")
 
@@ -301,7 +315,7 @@ class FlagForgeApp(App):
     async def update_remote_config_value(self, item: RemoteConfigItem, new_value: str) -> None:
         """Send asynchronous HTTP PUT request to backend to update the config value."""
         try:
-            async with httpx.AsyncClient(base_url="http://localhost:8000") as client:
+            async with httpx.AsyncClient(base_url="http://127.0.0.1:8000") as client:
                 response = await client.put(
                     f"/api/configs/{item.config_key}",
                     json={"value": new_value}
@@ -322,6 +336,77 @@ class FlagForgeApp(App):
                     )
         except Exception as e:
             self.notify(f"Connection error: {e}", title="Network Error", severity="error")
+
+    async def listen_websocket(self, project_id: int) -> None:
+        """Listen to real-time events from the backend WebSocket stream for a project."""
+        uri = f"ws://127.0.0.1:8000/api/stream/{project_id}"
+        while True:
+            try:
+                async with websockets.connect(uri) as websocket:
+                    while True:
+                        try:
+                            message_str = await websocket.recv()
+                            message = json.loads(message_str)
+                            self.handle_ws_message(message)
+                        except websockets.ConnectionClosed:
+                            break
+                        except Exception:
+                            pass
+            except Exception:
+                # Connection failed, retry after a delay
+                await asyncio.sleep(5)
+
+    def handle_ws_message(self, message: dict) -> None:
+        """Process incoming WebSocket broadcast message to update the TUI state cleanly without duplicating items."""
+        msg_type = message.get("type")
+        action = message.get("action")
+        key = message.get("key")
+
+        if msg_type == "config":
+            value = message.get("value")
+            configs_list = self.query_one("#remote-configs-list", RemoteConfigsList)
+            
+            # Find existing item to update in-place
+            found = False
+            for item in configs_list.query(RemoteConfigItem):
+                if item.config_key == key:
+                    if action == "delete":
+                        configs_list.remove(item)
+                    else:
+                        item.update_state(value)
+                    found = True
+                    break
+            
+            # If not found and not a deletion, append new item
+            if not found and action != "delete":
+                configs_list.append(RemoteConfigItem(key, value, ""))
+                
+            # Update subtitle count
+            total_items = len(configs_list.query(RemoteConfigItem))
+            configs_list.border_subtitle = f"{total_items} items"
+            
+        elif msg_type == "flag":
+            is_enabled = message.get("is_enabled")
+            flags_list = self.query_one("#feature-flags-list", FeatureFlagsList)
+            
+            # Find existing item to update in-place
+            found = False
+            for item in flags_list.query(FeatureFlagItem):
+                if item.flag_name == key:
+                    if action == "delete":
+                        flags_list.remove(item)
+                    else:
+                        item.update_state(is_enabled)
+                    found = True
+                    break
+                    
+            # If not found and not a deletion, append new item
+            if not found and action != "delete":
+                flags_list.append(FeatureFlagItem(0, key, is_enabled, ""))
+                
+            # Update subtitle count
+            total_items = len(flags_list.query(FeatureFlagItem))
+            flags_list.border_subtitle = f"{total_items} items"
 
     def filter_lists(self, query: str) -> None:
         """Filter feature flags and configs based on search query."""
