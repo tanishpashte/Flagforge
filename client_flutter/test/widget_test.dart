@@ -5,7 +5,7 @@ import 'package:client_flutter/main.dart';
 void main() {
   testWidgets('E-Commerce app mounts and displays shop name header', (WidgetTester tester) async {
     // Pump the app
-    await tester.pumpWidget(const ECommerceApp());
+    await tester.pumpWidget(const ECommerceApp(useLiveConnection: false));
 
     // Verify that the title / shop name is displayed
     expect(find.text('STUDIO ESSENTIALS'), findsOneWidget);
@@ -16,7 +16,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(800, 1200));
 
     // Pump the app
-    await tester.pumpWidget(const ECommerceApp());
+    await tester.pumpWidget(const ECommerceApp(useLiveConnection: false));
 
     // Verify all mock product names exist in the catalog feed
     expect(find.text('Studio Headset Mono'), findsOneWidget);
@@ -32,7 +32,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(800, 1200));
     
     // Pump the app
-    await tester.pumpWidget(const ECommerceApp());
+    await tester.pumpWidget(const ECommerceApp(useLiveConnection: false));
 
     // Tap on the first product (Studio Headset Mono)
     await tester.tap(find.text('Studio Headset Mono'));
@@ -49,7 +49,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(800, 1200));
 
     // Pump the app
-    await tester.pumpWidget(const ECommerceApp());
+    await tester.pumpWidget(const ECommerceApp(useLiveConnection: false));
 
     // Initially, badge should not be visible (cart is empty)
     expect(find.text('1'), findsNothing);
@@ -80,6 +80,7 @@ void main() {
         welcomeMessage: 'Special Welcome Greeting!',
         showSpecialOffer: true,
         showChatbot: true,
+        useLiveConnection: false,
       ),
     ));
 

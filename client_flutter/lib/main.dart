@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'flagforge_sdk.dart';
 
 void main() {
   runApp(const ECommerceApp());
 }
 
 class ECommerceApp extends StatelessWidget {
-  const ECommerceApp({super.key});
+  final bool useLiveConnection;
+  const ECommerceApp({super.key, this.useLiveConnection = true});
 
   @override
   Widget build(BuildContext context) {
@@ -91,7 +93,7 @@ class ECommerceApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const ECommerceDashboard(),
+      home: ECommerceDashboard(useLiveConnection: useLiveConnection),
     );
   }
 }
@@ -118,12 +120,14 @@ class ECommerceDashboard extends StatefulWidget {
   final String? welcomeMessage;
   final bool? showSpecialOffer;
   final bool? showChatbot;
+  final bool useLiveConnection;
 
   const ECommerceDashboard({
     super.key,
     this.welcomeMessage,
     this.showSpecialOffer,
     this.showChatbot,
+    this.useLiveConnection = true,
   });
 
   @override
@@ -136,12 +140,57 @@ class _ECommerceDashboardState extends State<ECommerceDashboard> {
   late bool showSpecialOffer;
   late bool showChatbot;
 
+  late final FlagForgeClient _client;
+
   @override
   void initState() {
     super.initState();
     welcomeMessage = widget.welcomeMessage ?? "Welcome to our shop!";
     showSpecialOffer = widget.showSpecialOffer ?? false;
     showChatbot = widget.showChatbot ?? false;
+
+    // Stream listener and state dispatcher initialization
+    _client = FlagForgeClient();
+    _client.addListener(() {
+      if (!mounted) return;
+
+      // 1. Map welcome_message configurations
+      final newWelcome = _client.getConfigValue('welcome_message');
+      if (newWelcome != null) {
+        setState(() {
+          welcomeMessage = newWelcome.toString();
+        });
+      }
+
+      // 2. Map show_special_offer flags
+      if (_client.flags.containsKey('show_special_offer')) {
+        setState(() {
+          showSpecialOffer = _client.isEnabled('show_special_offer');
+        });
+      }
+
+      // 3. Map ai_recommendations or enable_chatbot flags
+      if (_client.flags.containsKey('ai_recommendations')) {
+        setState(() {
+          showChatbot = _client.isEnabled('ai_recommendations');
+        });
+      } else if (_client.flags.containsKey('enable_chatbot')) {
+        setState(() {
+          showChatbot = _client.isEnabled('enable_chatbot');
+        });
+      }
+    });
+
+    // Wire and begin WebSocket/REST hydration with Project 1
+    if (widget.useLiveConnection) {
+      _client.initialize(1);
+    }
+  }
+
+  @override
+  void dispose() {
+    _client.dispose();
+    super.dispose();
   }
 
   // Static mock items
