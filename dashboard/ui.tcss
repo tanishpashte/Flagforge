@@ -19,7 +19,7 @@ CustomHeader {
     height: 3;
     background: $surface;
     border-bottom: tall $border-inactive;
-    padding: 0 2;
+    padding: 1 2 0 2;
 }
 
 #header-container {
@@ -30,6 +30,7 @@ CustomHeader {
 #header-title {
     content-align: left middle;
     width: 1fr;
+    height: 100%;
 }
 
 #header-status {
@@ -41,6 +42,7 @@ CustomHeader {
 ClockWidget {
     content-align: right middle;
     width: 1fr;
+    height: 100%;
     color: #f9e2af;
 }
 

@@ -25,7 +25,7 @@ class ClockWidget(Static):
         self.set_interval(1.0, self.update_time)
 
     def update_time(self) -> None:
-        self.update(datetime.now().strftime("📅 %Y-%m-%d  🕒 %H:%M:%S"))
+        self.update(datetime.now().strftime("[dim #7f849c]Date:[/] [bold #89b4fa]%Y-%m-%d[/]  [dim #7f849c]Time:[/] [bold #89b4fa]%H:%M:%S[/]"))
 
 
 class CustomHeader(Static):
@@ -33,8 +33,8 @@ class CustomHeader(Static):
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="header-container"):
-            yield Static(" 󰰚  [bold #89b4fa]FLAGFORGE[/] [dim #7f849c]TUI Shell[/]", id="header-title")
-            yield Static("[#a6e3a1]●[/#a6e3a1] DB: [bold #cdd6f4]Connected[/] | [#89b4fa]●[/#89b4fa] Version: [bold #cdd6f4]0.1.0[/]", id="header-status")
+            yield Static(" [bold #89b4fa]FLAGFORGE[/] [dim #7f849c]TUI Shell[/]", id="header-title")
+            yield Static("", id="header-status")
             yield ClockWidget()
 
 
@@ -333,6 +333,7 @@ class FlagForgeApp(App):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.active_ws_projects = set()
+        self.current_project_id = None
 
     BINDINGS = [
         ("q", "quit", "Quit"),
@@ -360,7 +361,7 @@ class FlagForgeApp(App):
         """Fetch real-world data from the running FastAPI HTTP backend endpoints."""
         self.notify("Fetching data from FlagForge backend...", title="Loading", severity="information")
         try:
-            async with httpx.AsyncClient(base_url="http://localhost:8000") as client:
+            async with httpx.AsyncClient(base_url="http://127.0.0.1:8000") as client:
                 # 1. Fetch projects
                 projects_response = await client.get("/api/projects/")
                 if projects_response.status_code == 200:
@@ -368,27 +369,8 @@ class FlagForgeApp(App):
                 else:
                     projects = []
 
-                # Find the default active project (first project)
-                default_project_id = None
-                if projects:
-                    default_project_id = projects[0].get("id")
-
-                # 2. Fetch flags for default project
-                flags = []
-                if default_project_id is not None:
-                    flags_response = await client.get(f"/api/flags/?project_id={default_project_id}")
-                    if flags_response.status_code == 200:
-                        flags = flags_response.json()
-
-                # 3. Fetch configs for default project
-                configs = []
-                if default_project_id is not None:
-                    configs_response = await client.get(f"/api/configs/?project_id={default_project_id}")
-                    if configs_response.status_code == 200:
-                        configs = configs_response.json()
-
-                # Populate UI lists
-                self.update_lists(projects, flags, configs)
+                # Populate UI lists (only projects list, flags and configs start empty!)
+                self.update_lists(projects, [], [])
                 self.notify("Successfully loaded data from backend.", title="Sync Complete", severity="information")
 
                 # Start WebSocket listeners for projects
@@ -453,8 +435,9 @@ class FlagForgeApp(App):
 
     async def fetch_project_data(self, project_id: int) -> None:
         """Fetch flags and configs for a specific project asynchronously."""
+        self.current_project_id = project_id
         try:
-            async with httpx.AsyncClient(base_url="http://localhost:8000") as client:
+            async with httpx.AsyncClient(base_url="http://127.0.0.1:8000") as client:
                 # 1. Fetch flags for project_id
                 flags_response = await client.get(f"/api/flags/?project_id={project_id}")
                 flags = flags_response.json() if flags_response.status_code == 200 else []
@@ -533,7 +516,7 @@ class FlagForgeApp(App):
                         try:
                             message_str = await websocket.recv()
                             message = json.loads(message_str)
-                            self.handle_ws_message(message)
+                            self.handle_ws_message(message, project_id)
                         except websockets.ConnectionClosed:
                             break
                         except Exception:
@@ -542,8 +525,11 @@ class FlagForgeApp(App):
                 # Connection failed, retry after a delay
                 await asyncio.sleep(5)
 
-    def handle_ws_message(self, message: dict) -> None:
+    def handle_ws_message(self, message: dict, message_project_id: int) -> None:
         """Process incoming WebSocket broadcast message to update the TUI state cleanly without duplicating items."""
+        if message_project_id != self.current_project_id:
+            return
+
         msg_type = message.get("type")
         action = message.get("action")
         key = message.get("key")
@@ -688,7 +674,7 @@ class FlagForgeApp(App):
     async def toggle_feature_flag(self, item: FeatureFlagItem) -> None:
         """Send asynchronous HTTP PATCH request to backend to toggle the flag."""
         try:
-            async with httpx.AsyncClient(base_url="http://localhost:8000") as client:
+            async with httpx.AsyncClient(base_url="http://127.0.0.1:8000") as client:
                 response = await client.patch(f"/api/flags/{item.flag_id}/toggle")
                 if response.status_code == 200:
                     data = response.json()
