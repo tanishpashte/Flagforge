@@ -7,6 +7,8 @@ import 'models.dart';
 
 class FlagForgeClient extends ChangeNotifier {
   final String host; // e.g. 'localhost:8000'
+  String? userId;
+  String? group;
 
   // Internal memory cache as requested by the specification
   final Map<String, dynamic> _flags = {};
@@ -196,6 +198,20 @@ class FlagForgeClient extends ChangeNotifier {
     _connectWebSocket(projectId);
   }
 
+  void updateContext(String? newUserId, String? newGroup, int projectId) {
+    userId = newUserId;
+    group = newGroup;
+    
+    _subscription?.cancel();
+    _subscription = null;
+    _channel?.sink.close();
+    _channel = null;
+    
+    _isConnecting = false;
+    _isReconnecting = false;
+    _connectWebSocket(projectId);
+  }
+
   /// Connects to real-time updates via WebSocket stream
   void _connectWebSocket(int projectId) {
     if (_isDisposed) return;
@@ -203,7 +219,18 @@ class FlagForgeClient extends ChangeNotifier {
     _isConnecting = true;
 
     final hostClean = host.replaceAll('http://', '').replaceAll('https://', '');
-    final wsUri = Uri.parse('ws://$hostClean/api/stream/$projectId');
+    var wsUrlStr = 'ws://$hostClean/api/stream/$projectId';
+    final queryParams = <String>[];
+    if (userId != null && userId!.isNotEmpty) {
+      queryParams.add('user_id=$userId');
+    }
+    if (group != null && group!.isNotEmpty) {
+      queryParams.add('group=$group');
+    }
+    if (queryParams.isNotEmpty) {
+      wsUrlStr += '?${queryParams.join('&')}';
+    }
+    final wsUri = Uri.parse(wsUrlStr);
 
     print('FlagForgeClient: Establishing real-time link at $wsUri');
 

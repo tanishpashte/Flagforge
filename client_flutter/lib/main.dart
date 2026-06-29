@@ -139,6 +139,9 @@ class _ECommerceDashboardState extends State<ECommerceDashboard> {
   late String welcomeMessage;
   late bool showSpecialOffer;
   late bool showChatbot;
+  
+  String _selectedUserId = '45';
+  String? _selectedGroup;
 
   late final FlagForgeClient _client;
 
@@ -151,6 +154,8 @@ class _ECommerceDashboardState extends State<ECommerceDashboard> {
 
     // Stream listener and state dispatcher initialization
     _client = FlagForgeClient();
+    _client.userId = _selectedUserId;
+    _client.group = _selectedGroup;
     _client.addListener(() {
       if (!mounted) return;
 
@@ -163,22 +168,14 @@ class _ECommerceDashboardState extends State<ECommerceDashboard> {
       }
 
       // 2. Map show_special_offer flags
-      if (_client.flags.containsKey('show_special_offer')) {
-        setState(() {
-          showSpecialOffer = _client.isEnabled('show_special_offer');
-        });
-      }
+      setState(() {
+        showSpecialOffer = _client.isEnabled('show_special_offer');
+      });
 
       // 3. Map ai_recommendations or enable_chatbot flags
-      if (_client.flags.containsKey('ai_recommendations')) {
-        setState(() {
-          showChatbot = _client.isEnabled('ai_recommendations');
-        });
-      } else if (_client.flags.containsKey('enable_chatbot')) {
-        setState(() {
-          showChatbot = _client.isEnabled('enable_chatbot');
-        });
-      }
+      setState(() {
+        showChatbot = _client.isEnabled('ai_recommendations') || _client.isEnabled('enable_chatbot');
+      });
     });
 
     // Wire and begin WebSocket/REST hydration with Project 3
@@ -554,6 +551,40 @@ class _ECommerceDashboardState extends State<ECommerceDashboard> {
           ],
         ),
       ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: cardBgColor,
+          border: Border(
+            top: BorderSide(color: borderColor, width: 1),
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'SIMULATE USER PERSONA',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: isDark ? Colors.white60 : Colors.black54,
+                letterSpacing: 1.0,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildPersonaChip('Regular User (ID: 45)', '45', null, borderColor, isDark),
+                _buildPersonaChip('Beta Tester (Group: beta, ID: 88)', '88', 'beta', borderColor, isDark),
+                _buildPersonaChip('Random Out-of-Bracket User (ID: 99)', '99', null, borderColor, isDark),
+              ],
+            ),
+          ],
+        ),
+      ),
       floatingActionButton: showChatbot
           ? FloatingActionButton(
               onPressed: () => _showChatbotDialog(context),
@@ -562,6 +593,45 @@ class _ECommerceDashboardState extends State<ECommerceDashboard> {
               child: const Icon(Icons.chat_bubble_outline),
             )
           : null,
+    );
+  }
+
+  Widget _buildPersonaChip(String label, String userId, String? group, Color borderColor, bool isDark) {
+    final isSelected = _selectedUserId == userId && _selectedGroup == group;
+    return ChoiceChip(
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          color: isSelected
+              ? (isDark ? Colors.black : Colors.white)
+              : (isDark ? Colors.white70 : Colors.black87),
+        ),
+      ),
+      selected: isSelected,
+      onSelected: (selected) {
+        if (selected) {
+          setState(() {
+            _selectedUserId = userId;
+            _selectedGroup = group;
+          });
+          if (widget.useLiveConnection) {
+            _client.updateContext(userId, group, 3);
+          }
+        }
+      },
+      selectedColor: isDark ? Colors.white : Colors.black,
+      backgroundColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(4),
+        side: BorderSide(
+          color: isSelected
+              ? (isDark ? Colors.white : Colors.black)
+              : borderColor,
+          width: 1,
+        ),
+      ),
     );
   }
 
