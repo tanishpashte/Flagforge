@@ -181,9 +181,9 @@ class _ECommerceDashboardState extends State<ECommerceDashboard> {
       }
     });
 
-    // Wire and begin WebSocket/REST hydration with Project 1
+    // Wire and begin WebSocket/REST hydration with Project 3
     if (widget.useLiveConnection) {
-      _client.initialize(1);
+      _client.initialize(3);
     }
   }
 

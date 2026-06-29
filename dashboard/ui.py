@@ -41,8 +41,9 @@ class CustomHeader(Static):
 class ProjectItem(ListItem):
     """ListItem representing a project."""
 
-    def __init__(self, name: str, key: str, active: bool = True):
+    def __init__(self, project_id: int, name: str, key: str, active: bool = True):
         super().__init__()
+        self.project_id = project_id
         self.project_name = name
         self.project_key = key
         self.active = active
@@ -235,21 +236,24 @@ class FlagForgeApp(App):
                 else:
                     projects = []
 
-                # 2. Fetch flags
-                flags_response = await client.get("/api/flags/")
-                if flags_response.status_code == 200:
-                    flags = flags_response.json()
-                else:
-                    flags = []
+                # Find the default active project (first project)
+                default_project_id = None
+                if projects:
+                    default_project_id = projects[0].get("id")
 
-                # 3. Fetch configs for all projects
+                # 2. Fetch flags for default project
+                flags = []
+                if default_project_id is not None:
+                    flags_response = await client.get(f"/api/flags/?project_id={default_project_id}")
+                    if flags_response.status_code == 200:
+                        flags = flags_response.json()
+
+                # 3. Fetch configs for default project
                 configs = []
-                for p in projects:
-                    p_id = p.get("id")
-                    if p_id is not None:
-                        configs_response = await client.get(f"/api/configs/?project_id={p_id}")
-                        if configs_response.status_code == 200:
-                            configs.extend(configs_response.json())
+                if default_project_id is not None:
+                    configs_response = await client.get(f"/api/configs/?project_id={default_project_id}")
+                    if configs_response.status_code == 200:
+                        configs = configs_response.json()
 
                 # Populate UI lists
                 self.update_lists(projects, flags, configs)
@@ -270,7 +274,7 @@ class FlagForgeApp(App):
         proj_list = self.query_one("#projects-list", ProjectsList)
         proj_list.clear()
         for p in projects:
-            proj_list.append(ProjectItem(p["name"], p.get("description") or "Active", True))
+            proj_list.append(ProjectItem(p["id"], p["name"], p.get("description") or "Active", True))
         proj_list.border_subtitle = f"{len(projects)} items"
 
         # Update Flags
@@ -303,6 +307,54 @@ class FlagForgeApp(App):
         item = event.item
         if isinstance(item, RemoteConfigItem):
             self.edit_remote_config(item)
+        elif isinstance(item, ProjectItem):
+            self.run_worker(self.fetch_project_data(item.project_id))
+
+    def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
+        """Handle highlight changes in list views."""
+        if event.list_view.id == "projects-list":
+            item = event.item
+            if isinstance(item, ProjectItem):
+                self.run_worker(self.fetch_project_data(item.project_id))
+
+    async def fetch_project_data(self, project_id: int) -> None:
+        """Fetch flags and configs for a specific project asynchronously."""
+        try:
+            async with httpx.AsyncClient(base_url="http://localhost:8000") as client:
+                # 1. Fetch flags for project_id
+                flags_response = await client.get(f"/api/flags/?project_id={project_id}")
+                flags = flags_response.json() if flags_response.status_code == 200 else []
+
+                # 2. Fetch configs for project_id
+                configs_response = await client.get(f"/api/configs/?project_id={project_id}")
+                configs = configs_response.json() if configs_response.status_code == 200 else []
+
+                # Repopulate UI
+                self.repopulate_flags_and_configs(flags, configs)
+        except Exception:
+            # Silence background network errors if backend offline
+            pass
+
+    def repopulate_flags_and_configs(self, flags: list, configs: list) -> None:
+        """Clear and repopulate the feature flags and configs ListViews."""
+        # Update Flags
+        flags_list = self.query_one("#feature-flags-list", FeatureFlagsList)
+        flags_list.clear()
+        for f in flags:
+            flags_list.append(FeatureFlagItem(f["id"], f["key"], f["is_enabled"], f.get("description") or ""))
+        flags_list.border_subtitle = f"{len(flags)} items"
+
+        # Update Configs
+        configs_list = self.query_one("#remote-configs-list", RemoteConfigsList)
+        configs_list.clear()
+        for c in configs:
+            configs_list.append(RemoteConfigItem(c["key"], c["value"], c.get("description") or ""))
+        configs_list.border_subtitle = f"{len(configs)} items"
+
+        # Re-apply active search filter
+        search_bar = self.query_one("#search-bar", Input)
+        search_query = search_bar.value.strip().lower()
+        self.filter_lists(search_query)
 
     def edit_remote_config(self, item: RemoteConfigItem) -> None:
         """Open the configuration edit modal for the selected item."""
