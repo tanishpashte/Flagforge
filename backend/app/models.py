@@ -37,6 +37,7 @@ class FeatureFlagBase(SQLModel):
     
     # Store dynamic rules as a JSON structure e.g., {"groups": ["beta"]}
     targeting_rules: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    targeting_rule: Dict[str, Any] = Field(default_factory=lambda: {"type": "everyone"}, sa_column=Column(JSON, server_default='{"type": "everyone"}'))
     project_id: int = Field(foreign_key="project.id", index=True)
 
 class FeatureFlag(FeatureFlagBase, table=True):

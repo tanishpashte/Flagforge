@@ -30,13 +30,56 @@ app.include_router(projects.router)
 app.include_router(flags.router)
 app.include_router(configs.router)
 
+async def send_evaluated_flags(websocket: WebSocket, project_id: int):
+    from sqlmodel import Session, select
+    from backend.app.database import engine
+    from backend.app.models import FeatureFlag
+    from backend.app.targeting import evaluate_targeting_rule
+    
+    context = manager.connection_contexts.get(websocket, {})
+    with Session(engine) as session:
+        flags = session.exec(select(FeatureFlag).where(FeatureFlag.project_id == project_id)).all()
+        for flag in flags:
+            evaluated_val = evaluate_targeting_rule(flag, context)
+            await websocket.send_json({
+                "type": "flag",
+                "key": flag.key,
+                "is_enabled": evaluated_val,
+                "action": "update"
+            })
+
 @app.websocket("/api/stream/{project_id}")
 async def websocket_endpoint(websocket: WebSocket, project_id: int):
+    import json
+    
+    # Parse query parameters for context
+    user_id = websocket.query_params.get("user_id") or websocket.query_params.get("id")
+    group = websocket.query_params.get("group")
+    
+    context = {}
+    if user_id:
+        context["id"] = user_id
+    if group:
+        context["group"] = group
+
     await websocket.accept()
-    await manager.connect(websocket, project_id)
+    await manager.connect(websocket, project_id, context)
     try:
+        # Immediately evaluate and send targeted flags
+        await send_evaluated_flags(websocket, project_id)
+        
         while True:
-            await websocket.receive_text()
+            data = await websocket.receive_text()
+            try:
+                payload = json.loads(data)
+                if isinstance(payload, dict):
+                    # Expect {"type": "context", "context": {...}} or just {...}
+                    new_ctx = payload.get("context") if "context" in payload else payload
+                    if isinstance(new_ctx, dict):
+                        manager.connection_contexts[websocket].update(new_ctx)
+                        await send_evaluated_flags(websocket, project_id)
+            except Exception:
+                pass
     except WebSocketDisconnect:
         pass
     finally:

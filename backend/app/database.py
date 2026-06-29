@@ -11,6 +11,15 @@ engine = create_engine(sqlite_url, echo=False, connect_args=connect_args)
 def init_db():
     SQLModel.metadata.create_all(engine)
     
+    # Run database migration to ensure targeting_rule column exists
+    from sqlalchemy import inspect, text
+    inspector = inspect(engine)
+    if "featureflag" in inspector.get_table_names():
+        columns = [col["name"] for col in inspector.get_columns("featureflag")]
+        if "targeting_rule" not in columns:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE featureflag ADD COLUMN targeting_rule TEXT DEFAULT '{\"type\": \"everyone\"}'"))
+    
     # Seed default data for E2E testing
     from backend.app.models import Project, FeatureFlag, RemoteConfig, ConfigType
     from sqlmodel import select
