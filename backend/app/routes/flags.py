@@ -9,12 +9,10 @@ from backend.app.ws_manager import manager
 router = APIRouter(prefix="/api/flags", tags=["Feature Flags"])
 
 @router.get("/", response_model=List[FeatureFlag])
-def read_flags(project_id: Optional[int] = None, session: Session = Depends(get_session)):
+def read_flags(project_id: Optional[int] = None, db: Session = Depends(get_session)):
     if project_id is not None:
-        statement = select(FeatureFlag).where(FeatureFlag.project_id == project_id)
-    else:
-        statement = select(FeatureFlag)
-    return session.exec(statement).all()
+        return db.query(FeatureFlag).filter(FeatureFlag.project_id == project_id).all()
+    return db.query(FeatureFlag).all()
 
 @router.post("/", response_model=FeatureFlag, status_code=status.HTTP_201_CREATED)
 def create_flag(flag: FeatureFlagBase, session: Session = Depends(get_session)):

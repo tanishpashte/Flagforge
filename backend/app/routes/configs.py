@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 from backend.app.database import get_session, update_remote_config
 from pydantic import BaseModel
@@ -26,9 +26,10 @@ def create_config(config: RemoteConfigBase, session: Session = Depends(get_sessi
     return db_config
 
 @router.get("/", response_model=List[RemoteConfig])
-def read_configs(project_id: int, session: Session = Depends(get_session)):
-    statement = select(RemoteConfig).where(RemoteConfig.project_id == project_id)
-    return session.exec(statement).all()
+def read_configs(project_id: Optional[int] = None, db: Session = Depends(get_session)):
+    if project_id is not None:
+        return db.query(RemoteConfig).filter(RemoteConfig.project_id == project_id).all()
+    return db.query(RemoteConfig).all()
 
 @router.patch("/{config_id}", response_model=RemoteConfig)
 async def update_config(config_id: int, updated_fields: RemoteConfigBase, session: Session = Depends(get_session)):

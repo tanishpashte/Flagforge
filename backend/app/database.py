@@ -19,6 +19,17 @@ def init_db():
         # 1. Ensure Project 1 exists
         project = session.get(Project, 1)
         if not project:
+            # Check if name "Default Project" is already taken
+            statement = select(Project).where(Project.name == "Default Project")
+            existing_by_name = session.exec(statement).first()
+            if existing_by_name:
+                existing_by_name.name = f"Default Project Legacy ({existing_by_name.id})"
+                session.add(existing_by_name)
+                try:
+                    session.commit()
+                except Exception:
+                    session.rollback()
+
             project = Project(id=1, name="Default Project", description="Default development project")
             session.add(project)
             try:
