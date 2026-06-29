@@ -48,6 +48,38 @@ async def toggle_flag(flag_id: int, session: Session = Depends(get_session)):
         "type": "flag",
         "key": db_flag.key,
         "is_enabled": db_flag.is_enabled,
+        "targeting_rule": db_flag.targeting_rule,
+        "action": "update"
+    })
+    return db_flag
+
+
+from pydantic import BaseModel
+
+class TargetingRuleUpdate(BaseModel):
+    type: str
+    parameter: Optional[str] = None
+
+@router.put("/{key}/rule", response_model=FeatureFlag)
+async def update_flag_rule(key: str, rule_update: TargetingRuleUpdate, session: Session = Depends(get_session)):
+    statement = select(FeatureFlag).where(FeatureFlag.key == key)
+    db_flag = session.exec(statement).first()
+    if not db_flag:
+        raise HTTPException(status_code=404, detail="Flag not found")
+        
+    db_flag.targeting_rule = rule_update.dict()
+    db_flag.updated_at = datetime.utcnow()
+    
+    session.add(db_flag)
+    session.commit()
+    session.refresh(db_flag)
+    
+    # Broadcast updated flag status
+    await manager.broadcast_to_project(db_flag.project_id, {
+        "type": "flag",
+        "key": db_flag.key,
+        "is_enabled": db_flag.is_enabled,
+        "targeting_rule": db_flag.targeting_rule,
         "action": "update"
     })
     return db_flag

@@ -54,32 +54,62 @@ class ProjectItem(ListItem):
         yield Label(f"[{color}]{icon}[/]  [bold #cdd6f4]{self.project_name}[/] [dim #7f849c]({self.project_key})[/]")
 
 
+def format_rule(rule: Any) -> str:
+    if not rule:
+        return ""
+    if isinstance(rule, str):
+        try:
+            rule = json.loads(rule)
+        except Exception:
+            return ""
+    if not isinstance(rule, dict):
+        return ""
+        
+    rule_type = rule.get("type", "everyone")
+    parameter = rule.get("parameter")
+    
+    if rule_type == "everyone":
+        return ""
+    elif rule_type == "group":
+        if parameter == "beta":
+            return " (Beta Users Only)"
+        return f" (Group: {parameter})"
+    elif rule_type == "rollout":
+        return f" (Rollout: {parameter}%)"
+    return ""
+
+
 class FeatureFlagItem(ListItem):
     """ListItem representing a feature flag."""
 
-    def __init__(self, flag_id: int, name: str, enabled: bool, description: str = ""):
+    def __init__(self, flag_id: int, name: str, enabled: bool, description: str = "", targeting_rule: Any = None):
         super().__init__()
         self.flag_id = flag_id
         self.flag_name = name
         self.enabled = enabled
         self.flag_description = description or ""
+        self.targeting_rule = targeting_rule or {"type": "everyone"}
 
     def compose(self) -> ComposeResult:
         icon = "" if self.enabled else ""
         status_text = "ON" if self.enabled else "OFF"
         status_color = "#a6e3a1" if self.enabled else "#f38ba8"
+        rule_text = format_rule(self.targeting_rule)
         yield Label(
-            f"[{status_color}]{icon}[/]  [bold #cdd6f4]{self.flag_name}[/] [dim #7f849c]is[/] [{status_color}]{status_text}[/]",
+            f"[{status_color}]{icon}[/]  [bold #cdd6f4]{self.flag_name}[/] [dim #7f849c]is[/] [{status_color}]{status_text}[/]{rule_text}",
             id="flag-label"
         )
 
-    def update_state(self, enabled: bool) -> None:
+    def update_state(self, enabled: bool, targeting_rule: Any = None) -> None:
         self.enabled = enabled
+        if targeting_rule is not None:
+            self.targeting_rule = targeting_rule
         icon = "" if self.enabled else ""
         status_text = "ON" if self.enabled else "OFF"
         status_color = "#a6e3a1" if self.enabled else "#f38ba8"
+        rule_text = format_rule(self.targeting_rule)
         label = self.query_one("#flag-label", Label)
-        label.update(f"[{status_color}]{icon}[/]  [bold #cdd6f4]{self.flag_name}[/] [dim #7f849c]is[/] [{status_color}]{status_text}[/]")
+        label.update(f"[{status_color}]{icon}[/]  [bold #cdd6f4]{self.flag_name}[/] [dim #7f849c]is[/] [{status_color}]{status_text}[/]{rule_text}")
 
 
 class RemoteConfigItem(ListItem):
@@ -192,6 +222,108 @@ class ConfigEditModal(ModalScreen):
         self.dismiss(None)
 
 
+class FlagRuleModal(ModalScreen):
+    """A modal dialog to edit a feature flag's targeting rule."""
+
+    BINDINGS = [
+        ("escape", "cancel", "Cancel"),
+    ]
+
+    def __init__(self, flag_key: str, current_rule: dict) -> None:
+        super().__init__()
+        self.flag_key = flag_key
+        self.current_rule = current_rule or {"type": "everyone"}
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="rule-modal-dialog"):
+            yield Label(f"Targeting Rule: [bold #89b4fa]{self.flag_key}[/]", id="rule-modal-label")
+            with ListView(id="rule-type-list"):
+                yield ListItem(Label("Everyone"), id="rule-everyone")
+                yield ListItem(Label("Beta Users Only"), id="rule-beta")
+                yield ListItem(Label("Custom Rollout %"), id="rule-rollout")
+            with Vertical(id="rollout-input-container"):
+                yield Label("Specify Rollout Percentage (0-100):")
+                initial_pct = ""
+                if self.current_rule.get("type") == "rollout":
+                    initial_pct = str(self.current_rule.get("parameter") or "")
+                yield Input(value=initial_pct, placeholder="e.g. 25", id="rollout-input")
+            with Horizontal(id="rule-modal-buttons"):
+                yield Button("Save", variant="success", id="rule-modal-save")
+                yield Button("Cancel", variant="error", id="rule-modal-cancel")
+
+    def on_mount(self) -> None:
+        list_view = self.query_one("#rule-type-list", ListView)
+        container = self.query_one("#rollout-input-container")
+        
+        rule_type = self.current_rule.get("type", "everyone")
+        parameter = self.current_rule.get("parameter")
+        
+        if rule_type == "everyone":
+            list_view.index = 0
+            container.display = False
+        elif rule_type == "group" and parameter == "beta":
+            list_view.index = 1
+            container.display = False
+        elif rule_type == "rollout":
+            list_view.index = 2
+            container.display = True
+        else:
+            list_view.index = 0
+            container.display = False
+            
+        list_view.focus()
+
+    def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
+        item = event.item
+        container = self.query_one("#rollout-input-container")
+        if item is not None:
+            if item.id == "rule-rollout":
+                container.display = True
+            else:
+                container.display = False
+
+    def on_list_view_selected(self, event: ListView.Selected) -> None:
+        item = event.item
+        if item is not None:
+            if item.id == "rule-rollout":
+                container = self.query_one("#rollout-input-container")
+                container.display = True
+                self.query_one("#rollout-input", Input).focus()
+            else:
+                self.save_rule()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "rule-modal-save":
+            self.save_rule()
+        elif event.button.id == "rule-modal-cancel":
+            self.dismiss(None)
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id == "rollout-input":
+            self.save_rule()
+
+    def save_rule(self) -> None:
+        list_view = self.query_one("#rule-type-list", ListView)
+        index = list_view.index
+        
+        if index == 0:
+            new_rule = {"type": "everyone", "parameter": None}
+        elif index == 1:
+            new_rule = {"type": "group", "parameter": "beta"}
+        elif index == 2:
+            pct_val = self.query_one("#rollout-input", Input).value.strip()
+            if not pct_val:
+                pct_val = "0"
+            new_rule = {"type": "rollout", "parameter": pct_val}
+        else:
+            new_rule = {"type": "everyone", "parameter": None}
+            
+        self.dismiss(new_rule)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
 class FlagForgeApp(App):
     """The main TUI Application class for FlagForge."""
 
@@ -281,7 +413,7 @@ class FlagForgeApp(App):
         flags_list = self.query_one("#feature-flags-list", FeatureFlagsList)
         flags_list.clear()
         for f in flags:
-            flags_list.append(FeatureFlagItem(f["id"], f["key"], f["is_enabled"], f.get("description") or ""))
+            flags_list.append(FeatureFlagItem(f["id"], f["key"], f["is_enabled"], f.get("description") or "", f.get("targeting_rule")))
         flags_list.border_subtitle = f"{len(flags)} items"
 
         # Update Configs
@@ -307,6 +439,8 @@ class FlagForgeApp(App):
         item = event.item
         if isinstance(item, RemoteConfigItem):
             self.edit_remote_config(item)
+        elif isinstance(item, FeatureFlagItem):
+            self.edit_feature_flag_rule(item)
         elif isinstance(item, ProjectItem):
             self.run_worker(self.fetch_project_data(item.project_id))
 
@@ -341,7 +475,7 @@ class FlagForgeApp(App):
         flags_list = self.query_one("#feature-flags-list", FeatureFlagsList)
         flags_list.clear()
         for f in flags:
-            flags_list.append(FeatureFlagItem(f["id"], f["key"], f["is_enabled"], f.get("description") or ""))
+            flags_list.append(FeatureFlagItem(f["id"], f["key"], f["is_enabled"], f.get("description") or "", f.get("targeting_rule")))
         flags_list.border_subtitle = f"{len(flags)} items"
 
         # Update Configs
@@ -439,6 +573,7 @@ class FlagForgeApp(App):
             
         elif msg_type == "flag":
             is_enabled = message.get("is_enabled")
+            targeting_rule = message.get("targeting_rule")
             flags_list = self.query_one("#feature-flags-list", FeatureFlagsList)
             
             # Find existing item to update in-place
@@ -448,13 +583,13 @@ class FlagForgeApp(App):
                     if action == "delete":
                         flags_list.remove(item)
                     else:
-                        item.update_state(is_enabled)
+                        item.update_state(is_enabled, targeting_rule)
                     found = True
                     break
                     
             # If not found and not a deletion, append new item
             if not found and action != "delete":
-                flags_list.append(FeatureFlagItem(0, key, is_enabled, ""))
+                flags_list.append(FeatureFlagItem(0, key, is_enabled, "", targeting_rule))
                 
             # Update subtitle count
             total_items = len(flags_list.query(FeatureFlagItem))
@@ -502,6 +637,39 @@ class FlagForgeApp(App):
         else:
             cfg_list.border_subtitle = f"{total_configs} items"
 
+    def edit_feature_flag_rule(self, item: FeatureFlagItem) -> None:
+        """Open the targeting rule edit modal for the selected feature flag."""
+        def handle_edit_result(new_rule: dict | None) -> None:
+            if new_rule is not None:
+                self.run_worker(self.update_feature_flag_rule(item, new_rule))
+
+        self.push_screen(FlagRuleModal(item.flag_name, item.targeting_rule), handle_edit_result)
+
+    async def update_feature_flag_rule(self, item: FeatureFlagItem, new_rule: dict) -> None:
+        """Send asynchronous HTTP PUT request to backend to update the flag's targeting rule."""
+        try:
+            async with httpx.AsyncClient(base_url="http://127.0.0.1:8000") as client:
+                response = await client.put(
+                    f"/api/flags/{item.flag_name}/rule",
+                    json=new_rule
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    item.update_state(data["is_enabled"], data.get("targeting_rule"))
+                    self.notify(
+                        f"Rule for '{item.flag_name}' updated successfully.",
+                        title="Mutation Successful",
+                        severity="information"
+                    )
+                else:
+                    self.notify(
+                        f"Failed to update rule: {response.status_code}",
+                        title="Mutation Failed",
+                        severity="error"
+                    )
+        except Exception as e:
+            self.notify(f"Connection error: {e}", title="Network Error", severity="error")
+
     def on_key(self, event: events.Key) -> None:
         """Handle keyboard interactions globally."""
         if event.key == "space":
@@ -525,7 +693,7 @@ class FlagForgeApp(App):
                 if response.status_code == 200:
                     data = response.json()
                     new_enabled = data["is_enabled"]
-                    item.update_state(new_enabled)
+                    item.update_state(new_enabled, data.get("targeting_rule"))
                     self.notify(
                         f"Flag '{item.flag_name}' turned {'ON' if new_enabled else 'OFF'}",
                         title="Mutation Successful",

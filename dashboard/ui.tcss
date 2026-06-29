@@ -167,3 +167,61 @@ ConfigEditModal {
     margin: 0 2;
     width: 15;
 }
+
+/* FlagRuleModal styling */
+FlagRuleModal {
+    align: center middle;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+#rule-modal-dialog {
+    width: 60;
+    height: auto;
+    border: thick $border-active;
+    background: $surface;
+    padding: 1 2;
+}
+
+#rule-modal-label {
+    margin-top: 1;
+    margin-bottom: 1;
+    width: 100%;
+    content-align: center middle;
+}
+
+#rule-type-list {
+    height: 7;
+    margin-bottom: 1;
+    border: tall $border-inactive;
+    background: $background;
+}
+
+#rollout-input-container {
+    height: auto;
+    margin-bottom: 1;
+    padding: 0 1;
+}
+
+#rollout-input {
+    margin-top: 1;
+    background: $background;
+    border: tall $border-inactive;
+    color: $text;
+}
+
+#rollout-input:focus {
+    border: tall $border-active;
+}
+
+#rule-modal-buttons {
+    layout: horizontal;
+    align: center middle;
+    height: 3;
+    content-align: center middle;
+}
+
+#rule-modal-buttons Button {
+    margin: 0 2;
+    width: 15;
+}
+
