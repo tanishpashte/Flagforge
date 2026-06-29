@@ -105,6 +105,7 @@ class Product {
   final double price;
   final String description;
   final IconData icon;
+  final String? imagePath;
 
   const Product({
     required this.id,
@@ -113,6 +114,7 @@ class Product {
     required this.price,
     required this.description,
     required this.icon,
+    this.imagePath,
   });
 }
 
@@ -199,6 +201,7 @@ class _ECommerceDashboardState extends State<ECommerceDashboard> {
       price: 299.00,
       description: 'Active noise cancelling wireless headset. Pure sound, architectural geometry.',
       icon: Icons.headphones_outlined,
+      imagePath: 'assets/images/headset.png',
     ),
     Product(
       id: 'p2',
@@ -207,6 +210,7 @@ class _ECommerceDashboardState extends State<ECommerceDashboard> {
       price: 149.00,
       description: 'Water-resistant rolltop bag with modular compartments and custom aluminum hardware.',
       icon: Icons.backpack_outlined,
+      imagePath: 'assets/images/backpack.png',
     ),
     Product(
       id: 'p3',
@@ -215,6 +219,7 @@ class _ECommerceDashboardState extends State<ECommerceDashboard> {
       price: 189.00,
       description: 'Tactile hot-swappable mechanical switches with solid anodized chassis.',
       icon: Icons.keyboard_outlined,
+      imagePath: 'assets/images/keyboard.png',
     ),
     Product(
       id: 'p4',
@@ -223,6 +228,7 @@ class _ECommerceDashboardState extends State<ECommerceDashboard> {
       price: 89.00,
       description: 'Dimmable warm LED fixture constructed from sandblasted aluminum components.',
       icon: Icons.light_outlined,
+      imagePath: 'assets/images/lamp.png',
     ),
   ];
 
@@ -444,7 +450,6 @@ class _ECommerceDashboardState extends State<ECommerceDashboard> {
                         children: [
                           // Graphic Frame box representing product image
                           Expanded(
-                            flex: 4,
                             child: Container(
                               width: double.infinity,
                               decoration: BoxDecoration(
@@ -456,89 +461,103 @@ class _ECommerceDashboardState extends State<ECommerceDashboard> {
                               ),
                               child: Hero(
                                 tag: 'product-icon-${product.id}',
-                                child: Icon(
-                                  product.icon,
-                                  size: 44,
-                                  color: isDark ? Colors.white38 : Colors.black38,
+                                child: ClipRRect(
+                                  borderRadius: const BorderRadius.only(
+                                    topLeft: Radius.circular(7),
+                                    topRight: Radius.circular(7),
+                                  ),
+                                  child: product.imagePath != null
+                                      ? Image.asset(
+                                          product.imagePath!,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) => Icon(
+                                            product.icon,
+                                            size: 44,
+                                            color: isDark ? Colors.white38 : Colors.black38,
+                                          ),
+                                        )
+                                      : Icon(
+                                          product.icon,
+                                          size: 44,
+                                          color: isDark ? Colors.white38 : Colors.black38,
+                                        ),
                                 ),
                               ),
                             ),
                           ),
                           // Content Info
-                          Expanded(
-                            flex: 3,
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        product.name,
-                                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
+                          Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      product.name,
+                                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
                                       ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        product.category.toUpperCase(),
-                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                          letterSpacing: 1.0,
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w600,
-                                        ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      product.category.toUpperCase(),
+                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                        letterSpacing: 1.0,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w600,
                                       ),
-                                    ],
-                                  ),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        '\$${product.price.toStringAsFixed(2)}',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.bold,
-                                          color: isDark ? Colors.white : Colors.black,
-                                        ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      '\$${product.price.toStringAsFixed(2)}',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: isDark ? Colors.white : Colors.black,
                                       ),
-                                      GestureDetector(
-                                        onTap: () {
-                                          setState(() {
-                                            if (isInCart) {
-                                              _cart.remove(product.id);
-                                            } else {
-                                              _cart.add(product.id);
-                                            }
-                                          });
-                                        },
-                                        child: AnimatedContainer(
-                                          duration: const Duration(milliseconds: 200),
-                                          padding: const EdgeInsets.all(6),
-                                          decoration: BoxDecoration(
-                                            color: isInCart
-                                                ? (isDark ? Colors.white24 : Colors.black12)
-                                                : (isDark ? Colors.white : Colors.black),
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: Icon(
-                                            isInCart ? Icons.check : Icons.add,
-                                            size: 14,
-                                            color: isInCart
-                                                ? (isDark ? Colors.white : Colors.black)
-                                                : (isDark ? Colors.black : Colors.white),
-                                          ),
+                                    ),
+                                    GestureDetector(
+                                      onTap: () {
+                                        setState(() {
+                                          if (isInCart) {
+                                            _cart.remove(product.id);
+                                          } else {
+                                            _cart.add(product.id);
+                                          }
+                                        });
+                                      },
+                                      child: AnimatedContainer(
+                                        duration: const Duration(milliseconds: 200),
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: isInCart
+                                              ? (isDark ? Colors.white24 : Colors.black12)
+                                              : (isDark ? Colors.white : Colors.black),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(
+                                          isInCart ? Icons.check : Icons.add,
+                                          size: 14,
+                                          color: isInCart
+                                              ? (isDark ? Colors.white : Colors.black)
+                                              : (isDark ? Colors.black : Colors.white),
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                ],
-                              ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -727,10 +746,23 @@ class _ECommerceDashboardState extends State<ECommerceDashboard> {
                             ),
                             child: Hero(
                               tag: 'product-icon-${product.id}',
-                              child: Icon(
-                                product.icon,
-                                size: 80,
-                                color: isDark ? Colors.white38 : Colors.black38,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: product.imagePath != null
+                                    ? Image.asset(
+                                        product.imagePath!,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) => Icon(
+                                          product.icon,
+                                          size: 80,
+                                          color: isDark ? Colors.white38 : Colors.black38,
+                                        ),
+                                      )
+                                    : Icon(
+                                        product.icon,
+                                        size: 80,
+                                        color: isDark ? Colors.white38 : Colors.black38,
+                                      ),
                               ),
                             ),
                           ),
