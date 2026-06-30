@@ -1,7 +1,7 @@
-# FlagForge 🚩
+# FlagForge 
 
 
-FlagForge acts like a **remote control** for software applications. 🕹️
+FlagForge acts like a **remote control** for software applications. 
 
 Usually, when developers want to turn a new feature on/off or change a setting (like a welcome message or theme color), they have to rewrite code, build a new version of the app, and make users download an update. 
 
